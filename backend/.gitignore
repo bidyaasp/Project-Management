@@ -1,0 +1,73 @@
+# ────────────────
+# Python
+# ────────────────
+__pycache__/
+*.py[cod]
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+wheels/
+.eggs/
+
+# ────────────────
+# Virtual environments
+# ────────────────
+.venv/
+venv/
+ENV/
+env/
+
+# ────────────────
+# Environment and local config
+# ────────────────
+.env
+.env.*
+*.env
+*.local
+config.json
+settings.json
+
+# ────────────────
+# IDE / Editor folders
+# ────────────────
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# ────────────────
+# Logs / cache
+# ────────────────
+*.log
+*.out
+*.bak
+*.swp
+*.pid
+*.db
+__pypackages__/
+.cache/
+.mypy_cache/
+.pytest_cache/
+coverage.xml
+htmlcov/
+.coverage
+.tox/
+
+# ────────────────
+# OS files
+# ────────────────
+.DS_Store
+Thumbs.db
+
+# ────────────────
+# Docker / Deployment
+# ────────────────
+*.dockerfile
+docker-compose.override.yml
+
+# ────────────────
+# Alembic
+# ────────────────
+alembic/versions/*.pyc
