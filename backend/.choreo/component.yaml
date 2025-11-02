@@ -1,4 +1,12 @@
 schemaVersion: "1.2"
+
+build:
+  commands:
+    - pip install -r requirements.txt
+
+run:
+  command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+
 endpoints:
     - name: rest-api-be2
       displayName: REST API

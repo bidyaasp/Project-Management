@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     DEFAULT_USER_PASSWORD: str
 
     # 🌐 CORS
-    ALLOWED_ORIGINS: str = ""
+    ALLOWED_ORIGINS: str
 
     @field_validator("ALLOWED_ORIGINS")
     def parse_allowed_origins(cls, v: str) -> List[str]:

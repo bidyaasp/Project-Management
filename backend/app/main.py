@@ -4,7 +4,7 @@ from app.api.router import router as api_router
 from app.db import models
 from app.db.database import engine
 from fastapi.middleware.cors import CORSMiddleware
-from core.config import Settings
+from app.core.config import settings
 
 app = FastAPI(title="Project Management API", version="0.1.0")
 
