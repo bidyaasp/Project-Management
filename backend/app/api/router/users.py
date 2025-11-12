@@ -83,6 +83,22 @@ def user_tasks(user_id: int, db: Session = Depends(get_db), current_user: models
     return query.all()
 
 
+@router.get("/{user_id}/assigned-tasks", response_model=list[schemas.TaskDetails])
+def user_tasks(user_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    role = current_user.role.name.lower()
+    if role == "developer":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not enough privileges"
+        )
+    
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    return db.query(models.Task).filter(models.Task.assignee_id == user_id).all()
+
+
 @router.patch("/{user_id}/toggle-activation", response_model=schemas.UserOut)
 def toggle_user_activation(
     user_id: int,

@@ -227,16 +227,20 @@ export default function TaskDetails() {
 
         <div>
           <p className="font-semibold">Due Date:</p>
-          <p
-            className={`mt-1 ${
-              isOverdue(task.due_date)
-                ? "text-red-600 font-medium"
-                : "text-green-600"
-            }`}
-          >
-            {task.due_date ? formatDate(task.due_date) : "No due date"}
-            {isOverdue(task.due_date) && " (Overdue)"}
-          </p>
+
+          {(() => {
+            const overdue = isOverdue(task.due_date) && task.status !== "done";
+            return (
+              <p
+                className={`mt-1 ${
+                  overdue ? "text-red-600 font-medium" : "text-green-600"
+                }`}
+              >
+                {task.due_date ? formatDate(task.due_date) : "No due date"}
+                {overdue && " (Overdue)"}
+              </p>
+            );
+          })()}
         </div>
 
         <div>

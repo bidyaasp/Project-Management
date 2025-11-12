@@ -225,7 +225,7 @@ const sortedTasks = useMemo(() => {
                       </td>
                       <td className={`px-6 py-4 text-sm font-medium ${dueDateColor}`}>
                         {formatDate(t.due_date)}
-                        {overdue && (
+                        {t.status !== "done" && overdue && (
                           <span className="ml-2 inline-flex items-center text-xs font-semibold text-red-600 bg-red-100 px-2 py-0.5 rounded-full">
                             ⚠️ Overdue
                           </span>
