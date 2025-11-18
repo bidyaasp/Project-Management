@@ -1,7 +1,8 @@
-from pydantic import BaseModel, EmailStr, field_serializer
+from pydantic import BaseModel, EmailStr, field_serializer, Field
 from typing import Optional, List
 from datetime import datetime
 import enum
+from app.db.models import TaskStatus, TaskPriority
 
 # Optional: keep RoleEnum for role creation convenience
 class RoleEnum(str, enum.Enum):
@@ -102,6 +103,8 @@ class TaskMini(BaseModel):
     due_date: Optional[datetime]
     created_at: Optional[datetime]
     createdBy: Optional[UserMini] = None
+    priority: Optional[TaskPriority] = None
+    estimated_hours: Optional[float] = None
 
     class Config:
         from_attributes = True
@@ -135,6 +138,8 @@ class TaskBase(BaseModel):
     title: str
     description: Optional[str] = None
     due_date: Optional[datetime] = None
+    priority: Optional[TaskPriority] = None
+    estimated_hours: Optional[float] = None
 
 class TaskCreate(TaskBase):
     assignee_id: Optional[int] = None
@@ -143,10 +148,13 @@ class TaskCreate(TaskBase):
 class TaskOut(TaskBase):
     id: int
     status: str
+    actual_hours: Optional[float] = None
     project_id: int
     assignee: Optional[UserMini] = None  # generic user object
     createdBy: Optional[UserMini] = None  # generic user object
     created_at: datetime
+    updated_at: datetime
+
     class Config:
         from_attributes = True
 
@@ -168,7 +176,50 @@ class TaskUpdate(BaseModel):
     title: Optional[str]
     description: Optional[str]
     due_date: Optional[datetime]
+    priority: Optional[TaskPriority] = None
+    estimated_hours: Optional[float] = None
+    actual_hours: Optional[float] = None
     assignee_id: Optional[int]
+
+class TimeLogBase(BaseModel):
+    hours: float = Field(..., gt=0, description="Time spent in hours")
+    description: Optional[str] = None
+    log_date: datetime
+
+class TimeLogCreate(TimeLogBase):
+    pass
+
+class TimeLogOut(TimeLogBase):
+    id: int
+    user: Optional[UserMini] = None
+    task_id: int
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class HistoryUser(BaseModel):
+    id: int
+    name: str
+
+    class Config:
+        from_attributes = True
+
+
+class TaskHistoryResponse(BaseModel):
+    id: int
+    action: str
+    field_name: Optional[str] = None
+    old_value: Optional[str] = None
+    new_value: Optional[str] = None
+    description: Optional[str] = None
+    changes: Optional[dict] = None
+    created_at: datetime
+    user: Optional[HistoryUser] = None   # user, not changed_by
+
+    class Config:
+        from_attributes = True
 
 # ------------------ Comment Schemas ------------------
 class CommentCreate(BaseModel):

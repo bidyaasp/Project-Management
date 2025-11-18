@@ -16,6 +16,8 @@ export default function ProjectDetail() {
     description: "",
     due_date: "",
     assignee_id: "",
+    priority: "",
+    estimated_hours: "",
   });
   const [selectedMemberIds, setSelectedMemberIds] = useState([]);
   const [editForm, setEditForm] = useState({
@@ -51,7 +53,7 @@ export default function ProjectDetail() {
     loadProject();
   }, [id]);
 
-    // ✅ Fetch Project Progress
+  // ✅ Fetch Project Progress
   useEffect(() => {
     const fetchProgress = async () => {
       try {
@@ -190,12 +192,12 @@ export default function ProjectDetail() {
           </h1>
         </div>
         <div className="flex space-x-2">
-        <button
-          onClick={() => navigate("/projects")}
-          className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded"
-        >
-          ← Back
-        </button>
+          <button
+            onClick={() => navigate("/projects")}
+            className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded"
+          >
+            ← Back
+          </button>
           {user?.role.name === "admin" && (
             <>
               <button
@@ -300,69 +302,67 @@ export default function ProjectDetail() {
                   {canManage && <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Actions</th>}
                 </tr>
               </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {project.tasks.map((t) => (
-                    <tr
-                      key={t.id}
-                      className="hover:bg-gray-50 cursor-pointer"
-                      onClick={() => navigate(`/tasks/${t.id}`, { state: { projectId: project.id } })} // ✅ navigate to task details
+              <tbody className="bg-white divide-y divide-gray-200">
+                {project.tasks.map((t) => (
+                  <tr
+                    key={t.id}
+                    className="hover:bg-gray-50 cursor-pointer"
+                    onClick={() => navigate(`/tasks/${t.id}`, { state: { projectId: project.id } })} // ✅ navigate to task details
+                  >
+                    <td className="px-4 py-2 text-sm text-gray-900">{t.title}</td>
+                    <td className="px-4 py-2 text-sm text-gray-700">{t.assignee?.name || "-"}</td>
+                    <td
+                      className={`px-4 py-2 text-sm font-medium ${t.status === "done"
+                          ? "text-green-600"
+                          : isOverdue(t.due_date, t.status)
+                            ? "text-red-600"
+                            : "text-gray-700"
+                        }`}
                     >
-                      <td className="px-4 py-2 text-sm text-gray-900">{t.title}</td>
-                      <td className="px-4 py-2 text-sm text-gray-700">{t.assignee?.name || "-"}</td>
-                      <td
-                          className={`px-4 py-2 text-sm font-medium ${
-                            t.status === "done"
-                              ? "text-green-600"
-                              : isOverdue(t.due_date, t.status)
-                              ? "text-red-600"
-                              : "text-gray-700"
-                          }`}
-                        >
-                          {t.due_date ? formatDate(t.due_date) : "-"}
-                          {t.status !== "done" && isOverdue(t.due_date, t.status) && (
-                            <span className="ml-2 inline-flex items-center text-xs font-semibold text-red-600 bg-red-100 px-2 py-0.5 rounded-full">
-                              ⚠️ Overdue
-                            </span>
-                          )}
-                      </td>
-                      <td className="px-4 py-2 text-sm">
-                        <span
-                          className={`px-2 py-1 text-xs font-medium rounded-full ${
-                            t.status === "done"
-                              ? "bg-green-100 text-green-800"
-                              : t.status === "in_progress"
+                      {t.due_date ? formatDate(t.due_date) : "-"}
+                      {t.status !== "done" && isOverdue(t.due_date, t.status) && (
+                        <span className="ml-2 inline-flex items-center text-xs font-semibold text-red-600 bg-red-100 px-2 py-0.5 rounded-full">
+                          ⚠️ Overdue
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-2 text-sm">
+                      <span
+                        className={`px-2 py-1 text-xs font-medium rounded-full ${t.status === "done"
+                            ? "bg-green-100 text-green-800"
+                            : t.status === "in_progress"
                               ? "bg-yellow-100 text-yellow-800"
                               : "bg-gray-100 text-gray-800"
                           }`}
+                      >
+                        {t.status.replace("_", " ").toUpperCase()}
+                      </span>
+                    </td>
+                    {canManage && (
+                      <td className="px-4 py-2 text-sm flex gap-2">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation(); // Prevent row click from firing
+                            setEditingTask({ ...t, assignee_id: t.assignee?.id || "" });
+                          }}
+                          className="text-blue-600 hover:underline"
                         >
-                          {t.status.replace("_", " ").toUpperCase()}
-                        </span>
+                          Edit
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation(); // Prevent row click from firing
+                            handleDeleteTask(t.id);
+                          }}
+                          className="text-red-600 hover:underline"
+                        >
+                          Delete
+                        </button>
                       </td>
-                      {canManage && (
-                        <td className="px-4 py-2 text-sm flex gap-2">
-                          <button
-                            onClick={(e) => { 
-                              e.stopPropagation(); // Prevent row click from firing
-                              setEditingTask({ ...t, assignee_id: t.assignee?.id || "" });
-                            }}
-                            className="text-blue-600 hover:underline"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            onClick={(e) => { 
-                              e.stopPropagation(); // Prevent row click from firing
-                              handleDeleteTask(t.id);
-                            }}
-                            className="text-red-600 hover:underline"
-                          >
-                            Delete
-                          </button>
-                        </td>
-                      )}
-                    </tr>
-                  ))}
-                </tbody>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
 
             </table>
           </div>
@@ -389,12 +389,17 @@ export default function ProjectDetail() {
               placeholder="Description"
               className="border rounded w-full p-2 mb-3"
             />
-            <input
-              type="datetime-local"
-              value={newTask.due_date}
-              onChange={(e) => setNewTask({ ...newTask, due_date: e.target.value })}
-              className="border rounded w-full p-2 mb-3"
-            />
+            <div>
+                <label className="block text-sm font-medium mb-1">
+                  Due date
+                </label>
+                <input
+                  type="datetime-local"
+                  value={newTask.due_date}
+                  onChange={(e) => setNewTask({ ...newTask, due_date: e.target.value })}
+                  className="border rounded w-full p-2 mb-3"
+                />
+            </div>
             <select
               value={newTask.assignee_id}
               onChange={(e) => setNewTask({ ...newTask, assignee_id: e.target.value })}
@@ -407,6 +412,32 @@ export default function ProjectDetail() {
                 </option>
               ))}
             </select>
+            <select
+              value={newTask.priority}
+              onChange={(e) =>
+                setNewTask({ ...newTask, priority: e.target.value })
+              }
+              className="border rounded w-full p-2 mb-4"
+            >
+              <option value="">Select Priority</option>
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+            </select>
+            <input
+                  type="number"
+                  min="1"
+                  step="0.5"
+                  value={newTask.estimated_hours}
+                  placeholder="Estimated Hours"
+                  onChange={(e) =>
+                    setNewTask({
+                      ...newTask,
+                      estimated_hours: e.target.value,
+                    })
+                  }
+                  className="border rounded w-full p-2 mb-3"
+            />
             <div className="flex justify-end space-x-2">
               <button onClick={() => setShowTaskForm(false)} className="bg-gray-200 px-4 py-2 rounded">
                 Cancel
@@ -464,37 +495,93 @@ export default function ProjectDetail() {
         <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center">
           <div className="bg-white rounded-lg p-6 w-96 shadow-lg">
             <h3 className="text-xl font-semibold mb-4">Edit Task</h3>
-            <input
-              type="text"
-              value={editingTask.title}
-              onChange={(e) => setEditingTask({ ...editingTask, title: e.target.value })}
-              placeholder="Title"
-              className="border rounded w-full p-2 mb-3"
-            />
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                Title
+              </label>        
+              <input
+                type="text"
+                value={editingTask.title}
+                onChange={(e) => setEditingTask({ ...editingTask, title: e.target.value })}
+                placeholder="Title"
+                className="border rounded w-full p-2 mb-3"
+              />                    
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                Description
+              </label>                 
             <textarea
               value={editingTask.description}
               onChange={(e) => setEditingTask({ ...editingTask, description: e.target.value })}
               placeholder="Description"
               className="border rounded w-full p-2 mb-3"
-            />
-            <input
-              type="datetime-local"
-              value={editingTask.due_date || ""}
-              onChange={(e) => setEditingTask({ ...editingTask, due_date: e.target.value })}
-              className="border rounded w-full p-2 mb-3"
-            />
-            <select
-              value={editingTask.assignee_id || ""}
-              onChange={(e) => setEditingTask({ ...editingTask, assignee_id: e.target.value })}
-              className="border rounded w-full p-2 mb-4"
-            >
-              <option value="">Assign to</option>
-              {project.members.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.name} ({m.role?.name})
-                </option>
-              ))}
-            </select>
+            />              
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                Due date
+              </label>
+              <input
+                type="datetime-local"
+                value={editingTask.due_date || ""}
+                onChange={(e) => setEditingTask({ ...editingTask, due_date: e.target.value })}
+                className="border rounded w-full p-2 mb-3"
+              />                       
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                Asignee
+              </label>
+              <select
+                value={editingTask.assignee_id || ""}
+                onChange={(e) => setEditingTask({ ...editingTask, assignee_id: e.target.value })}
+                className="border rounded w-full p-2 mb-4"
+              >
+                <option value="">Assign to</option>
+                {project.members.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name} ({m.role?.name})
+                  </option>
+                ))}
+              </select>                            
+            </div>
+             <div>
+                <label className="block text-sm font-medium mb-1">
+                  Priority
+                </label>
+                <select
+                  value={editingTask.priority || ""}
+                  onChange={(e) =>
+                    setEditingTask({ ...editingTask, priority: e.target.value })
+                  }
+                  className="border rounded w-full p-2 mb-3"
+                >
+                  <option value="">Select Priority</option>
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Estimated Hours
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  step="0.5"
+                  value={editingTask.estimated_hours || ""}
+                  onChange={(e) =>
+                    setEditingTask({
+                      ...editingTask,
+                      estimated_hours: e.target.value,
+                    })
+                  }
+                  className="border rounded w-full p-2 mb-3"
+                />
+              </div>
             <div className="flex justify-end space-x-2">
               <button onClick={() => setEditingTask(null)} className="bg-gray-200 px-4 py-2 rounded">Cancel</button>
               <button onClick={handleEditTask} className="bg-blue-600 text-white px-4 py-2 rounded">Save</button>
@@ -545,7 +632,7 @@ export default function ProjectDetail() {
                   </label>
                 ))}
               </div>
-            </div>            
+            </div>
             <div className="flex justify-end space-x-2">
               <button onClick={() => setShowEditModal(false)} className="bg-gray-200 px-4 py-2 rounded">Cancel</button>
               <button onClick={handleEditProject} className="bg-blue-600 text-white px-4 py-2 rounded">Save</button>

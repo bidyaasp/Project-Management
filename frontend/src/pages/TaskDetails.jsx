@@ -25,7 +25,27 @@ export default function TaskDetails() {
     description: "",
     due_date: "",
     assignee_id: "",
+    priority: "medium",       // default instead of ""
+    estimated_hours: null,    // null instead of ""
+    actual_hours: null,       // null instead of ""
   });
+
+  const [history, setHistory] = useState([]);
+  const [loadingHistory, setLoadingHistory] = useState(true);
+
+  const [openAccordion, setOpenAccordion] = useState("comments");
+
+  const toggleAccordion = (key) => {
+    setOpenAccordion((prev) => (prev === key ? "" : key));
+  };
+
+  const [timeLogs, setTimeLogs] = useState([]);
+  const [loadingLogs, setLoadingLogs] = useState(true);
+
+  const [logHours, setLogHours] = useState("");
+  const [logNote, setLogNote] = useState("");
+  const [showLogWorkModal, setShowLogWorkModal] = useState(false);
+
 
   // Fetch task
   useEffect(() => {
@@ -68,6 +88,9 @@ export default function TaskDetails() {
         description: task.description || "",
         due_date: task.due_date || "",
         assignee_id: task.assignee?.id || "",
+        priority: task.priority || "",
+        estimated_hours: task.estimated_hours || "",
+        actual_hours: task.actual_hours || "",
       });
     }
   }, [task]);
@@ -93,7 +116,17 @@ export default function TaskDetails() {
   // Save edited task
   const handleEditTask = async () => {
     try {
-      await api.put(`/tasks/${task.id}`, editForm);
+      const payload = {
+        ...editForm,
+        priority: editForm.priority || "medium",
+        estimated_hours:
+          editForm.estimated_hours === "" ? null : Number(editForm.estimated_hours),
+        actual_hours:
+          editForm.actual_hours === "" ? null : Number(editForm.actual_hours),
+      };
+
+      await api.put(`/tasks/${task.id}`, payload);
+
       const res = await api.get(`/tasks/${task.id}`);
       setTask(res.data);
       setEditing(false);
@@ -151,6 +184,66 @@ export default function TaskDetails() {
     }
   };
 
+  // Fetch task history
+  useEffect(() => {
+    if (!task) return;
+    const fetchHistory = async () => {
+      try {
+        const res = await api.get(`/tasks/${task.id}/history`);
+        setHistory(res.data);
+      } catch (err) {
+        console.error("Error loading task history:", err);
+      } finally {
+        setLoadingHistory(false);
+      }
+    };
+    fetchHistory();
+  }, [task]);
+
+  // fetch time logs
+  useEffect(() => {
+    if (!task) return;
+    const fetchTimeLogs = async () => {
+      try {
+        const res = await api.get(`/timelogs/tasks/${task.id}`);
+        setTimeLogs(res.data);
+      } catch (err) {
+        console.error("Error loading time logs:", err);
+      } finally {
+        setLoadingLogs(false);
+      }
+    };
+    fetchTimeLogs();
+  }, [task]);
+
+
+  const handleLogWorkSubmit = async (e) => {
+    e.preventDefault();
+
+    try {
+      await api.post(`/timelogs/tasks/${task.id}`, {
+        hours: logHours,
+        description: logNote,
+        log_date: new Date().toISOString(),
+      });
+
+      // Clear form
+      setLogHours("");
+      setLogNote("");
+
+      // Close modal
+      setShowLogWorkModal(false);
+
+      // Refresh task after log
+      const res = await api.get(`/tasks/${task.id}`);
+      setTask(res.data);
+
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+
   if (loading)
     return (
       <p className="text-gray-500 p-6 text-center">Loading task details...</p>
@@ -180,11 +273,21 @@ export default function TaskDetails() {
         {["admin", "manager"].includes(user?.role?.name?.toLowerCase()) && (
           <button
             onClick={() => setEditing(true)}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium shadow-md hover:bg-blue-700 transition duration-200 flex items-center gap-2"
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium shadow-md hover:bg-blue-700 transition duration-200 flex items-center"
           >
             ✏️ Edit Task
           </button>
         )}
+        {/* Log Work */}
+        {isAssignee && (
+            <button
+              onClick={() => setShowLogWorkModal(true)}
+              className="bg-green-600 text-white px-4 py-2 rounded-lg font-medium shadow-md hover:bg-green-700 transition duration-200 flex items-center"
+            >
+              Log Work
+            </button>
+        )}
+
       </div>
 
       <p className="text-gray-700 mb-6">
@@ -193,18 +296,18 @@ export default function TaskDetails() {
 
       {/* --- Task Info --- */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6 text-gray-700 text-sm">
+        {/* Status */}
         <div>
           <p className="font-semibold">Status:</p>
           {isAssignee ? (
             <div className="flex items-center mt-1 gap-2">
               <select
-                className={`border rounded px-2 py-1 ${
-                  status === "done"
-                    ? "text-green-600"
-                    : status === "in_progress"
+                className={`border rounded px-2 py-1 ${status === "done"
+                  ? "text-green-600"
+                  : status === "in_progress"
                     ? "text-yellow-600"
                     : "text-red-600"
-                }`}
+                  }`}
                 value={status}
                 onChange={(e) => setStatus(e.target.value)}
               >
@@ -225,16 +328,30 @@ export default function TaskDetails() {
           )}
         </div>
 
+        {/* Priority */}
+        <div>
+          <p className="font-semibold">Priority:</p>
+          <p
+            className={`mt-1 capitalize ${task.priority === "high"
+              ? "text-red-600 font-medium"
+              : task.priority === "medium"
+                ? "text-yellow-600 font-medium"
+                : "text-green-600"
+              }`}
+          >
+            {task.priority || "Not set"}
+          </p>
+        </div>
+
+        {/* Due Date */}
         <div>
           <p className="font-semibold">Due Date:</p>
-
           {(() => {
             const overdue = isOverdue(task.due_date) && task.status !== "done";
             return (
               <p
-                className={`mt-1 ${
-                  overdue ? "text-red-600 font-medium" : "text-green-600"
-                }`}
+                className={`mt-1 ${overdue ? "text-red-600 font-medium" : "text-green-600"
+                  }`}
               >
                 {task.due_date ? formatDate(task.due_date) : "No due date"}
                 {overdue && " (Overdue)"}
@@ -243,6 +360,27 @@ export default function TaskDetails() {
           })()}
         </div>
 
+        {/* Estimated Hours */}
+        <div>
+          <p className="font-semibold">Estimated Hours:</p>
+          <p className="mt-1">{task.estimated_hours ?? "Not set"}</p>
+        </div>
+
+        {/* Actual Hours */}
+        <div>
+          <p className="font-semibold">Actual Hours Logged:</p>
+          <p className="mt-1">{task.actual_hours ?? 0}</p>
+        </div>
+
+        {/* Updated At */}
+        <div>
+          <p className="font-semibold">Last Updated:</p>
+          <p className="mt-1">
+            {task.updated_at ? formatDate(task.updated_at) : "—"}
+          </p>
+        </div>
+
+        {/* Assignee */}
         <div>
           <p className="font-semibold">Assignee:</p>
           <p className="mt-1">
@@ -250,27 +388,27 @@ export default function TaskDetails() {
           </p>
         </div>
 
+        {/* Created By */}
         <div>
-          <p className="font-semibold">Assigned By:</p>
+          <p className="font-semibold">Created By:</p>
           <p className="mt-1">
             {task.createdBy ? task.createdBy.name : "Unassigned"}
           </p>
         </div>
-        
-        <div>
-          <p className="font-semibold">Assigned Date:</p>
-          <p className="mt-1">
-            {task.created_at
-              ? formatDate(task.created_at)
-              : ""}
-          </p>
-        </div>
 
+        {/* Project */}
         <div>
           <p className="font-semibold">Project:</p>
           <p className="mt-1">{task.project ? task.project.title : "-"}</p>
         </div>
+
+        {/* Created At */}
+        <div>
+          <p className="font-semibold">Created Date:</p>
+          <p className="mt-1">{task.created_at ? formatDate(task.created_at) : ""}</p>
+        </div>
       </div>
+
 
       {/* --- Project Details --- */}
       <div>
@@ -284,8 +422,10 @@ export default function TaskDetails() {
 
       {/* ✅ Edit Modal */}
       {editing && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg p-6">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg p-6 
+                        max-h-[90vh] overflow-y-auto">
+
             <h2 className="text-2xl font-bold mb-4 text-gray-800 border-b pb-2">
               Edit Task
             </h2>
@@ -354,6 +494,58 @@ export default function TaskDetails() {
               </div>
             </div>
 
+            {/* ✅ Priority */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Priority
+              </label>
+              <select
+                value={editForm.priority || "medium"}
+                onChange={(e) =>
+                  setEditForm({ ...editForm, priority: e.target.value })
+                }
+                className="w-full border border-gray-300 rounded-lg px-3 py-2"
+              >
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+              </select>
+            </div>
+
+            {/* ✅ Estimated Hours */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Estimated Hours
+              </label>
+              <input
+                type="number"
+                min="0"
+                step="0.1"
+                value={editForm.estimated_hours || ""}
+                onChange={(e) =>
+                  setEditForm({ ...editForm, estimated_hours: e.target.value })
+                }
+                className="w-full border border-gray-300 rounded-lg px-3 py-2"
+              />
+            </div>
+
+            {/* ✅ Actual Hours */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Actual Hours
+              </label>
+              <input
+                type="number"
+                min="0"
+                step="0.1"
+                value={editForm.actual_hours || ""}
+                onChange={(e) =>
+                  setEditForm({ ...editForm, actual_hours: e.target.value })
+                }
+                className="w-full border border-gray-300 rounded-lg px-3 py-2"
+              />
+            </div>
+
             <div className="flex justify-end gap-3 mt-6">
               <button
                 onClick={() => setEditing(false)}
@@ -372,62 +564,234 @@ export default function TaskDetails() {
         </div>
       )}
 
-      {/* ---------------- Comments ---------------- */}
-      <div className="mt-8">
-        <h2 className="text-lg font-semibold mb-4 text-gray-900">Comments</h2>
 
-        {isAssignee && (
-          <div className="flex gap-2 mb-4">
-            <input
-              type="text"
-              placeholder="Write a comment..."
-              className="flex-1 border rounded px-3 py-2"
-              value={newComment}
-              onChange={(e) => setNewComment(e.target.value)}
-            />
-            <button
-              className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 disabled:opacity-50"
-              onClick={handleAddComment}
-              disabled={postingComment || !newComment.trim()}
-            >
-              {postingComment ? "Posting..." : "Add"}
-            </button>
+      {showLogWorkModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg w-96 shadow-xl">
+            <h3 className="text-xl font-semibold mb-4">Log Work</h3>
+
+            <form onSubmit={handleLogWorkSubmit} className="flex flex-col gap-4">
+              <div>
+                <label>Hours</label>
+                <input
+                  type="number"
+                  required
+                  min="0"
+                  step="0.1"
+                  className="border p-2 w-full rounded"
+                  value={logHours}
+                  onChange={(e) => setLogHours(e.target.value)}
+                />
+              </div>
+
+              <div>
+                <label>Notes</label>
+                <textarea
+                  required
+                  className="border p-2 w-full rounded"
+                  value={logNote}
+                  onChange={(e) => setLogNote(e.target.value)}
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 mt-3">
+                <button
+                  type="button"
+                  onClick={() => setShowLogWorkModal(false)}
+                  className="px-4 py-2 bg-gray-400 text-white rounded"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-green-600 text-white rounded"
+                >
+                  Save
+                </button>
+              </div>
+            </form>
           </div>
-        )}
+        </div>
+      )}
 
-        {loadingComments ? (
-          <p className="text-gray-500">Loading comments...</p>
-        ) : comments.length === 0 ? (
-          <p className="text-gray-500">No comments yet.</p>
-        ) : (
-          <ul className="space-y-3">
-            {comments.map((c) => (
-              <li
-                key={c.id}
-                className="border rounded p-3 bg-gray-50 flex justify-between items-start"
-              >
-                <div>
-                  <p className="font-semibold text-gray-800">
-                    {c.author.name}
-                  </p>
-                  <p className="text-gray-700">{c.content}</p>
-                  <p className="text-gray-400 text-xs">
-                    {new Date(c.created_at).toLocaleString()}
-                  </p>
-                </div>
-                {c.author?.id === user?.id && (
+
+
+      {/* ---- HORIZONTAL ACCORDIONS ---- */}
+      <div className="mt-10 grid grid-cols-1 gap-4">
+
+        {/* COMMENTS ACCORDION */}
+        <div className="border rounded-lg overflow-hidden">
+          <button
+            onClick={() => toggleAccordion("comments")}
+            className="w-full flex justify-between items-center px-4 py-3 bg-gray-100 hover:bg-gray-200 text-left"
+          >
+            <span className="font-semibold text-gray-900">💬 Comments</span>
+            <span>{openAccordion === "comments" ? "▲" : "▼"}</span>
+          </button>
+
+          {openAccordion === "comments" && (
+            <div className="p-4 bg-white">
+
+              {/* Add Comment */}
+              {isAssignee && (
+                <div className="flex gap-2 mb-4">
+                  <input
+                    type="text"
+                    placeholder="Write a comment..."
+                    className="flex-1 border rounded px-3 py-2"
+                    value={newComment}
+                    onChange={(e) => setNewComment(e.target.value)}
+                  />
                   <button
-                    onClick={() => handleDeleteComment(c.id)}
-                    className="text-red-500 hover:underline text-sm"
+                    className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 disabled:opacity-50"
+                    onClick={handleAddComment}
+                    disabled={postingComment || !newComment.trim()}
                   >
-                    Delete
+                    {postingComment ? "Posting..." : "Add"}
                   </button>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
+                </div>
+              )}
+
+              {/* Comments List */}
+              {loadingComments ? (
+                <p className="text-gray-500">Loading comments...</p>
+              ) : comments.length === 0 ? (
+                <p className="text-gray-500">No comments yet.</p>
+              ) : (
+                <ul className="space-y-3">
+                  {comments.map((c) => (
+                    <li
+                      key={c.id}
+                      className="border rounded p-3 bg-gray-50 flex justify-between items-start"
+                    >
+                      <div>
+                        <p className="font-semibold text-gray-800">{c.author.name}</p>
+                        <p className="text-gray-700">{c.content}</p>
+                        <p className="text-gray-400 text-xs">
+                          {new Date(c.created_at).toLocaleString()}
+                        </p>
+                      </div>
+                      {c.author?.id === user?.id && (
+                        <button
+                          onClick={() => handleDeleteComment(c.id)}
+                          className="text-red-500 hover:underline text-sm"
+                        >
+                          Delete
+                        </button>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* TASK HISTORY ACCORDION */}
+        <div className="border rounded-lg overflow-hidden">
+          <button
+            onClick={() => toggleAccordion("history")}
+            className="w-full flex justify-between items-center px-4 py-3 bg-gray-100 hover:bg-gray-200 text-left"
+          >
+            <span className="font-semibold text-gray-900">📜 Task History</span>
+            <span>{openAccordion === "history" ? "▲" : "▼"}</span>
+          </button>
+
+          {openAccordion === "history" && (
+            <div className="p-4 bg-white">
+
+              {loadingHistory ? (
+                <p className="text-gray-500">Loading history...</p>
+              ) : history.length === 0 ? (
+                <p className="text-gray-500">No history available.</p>
+              ) : (
+                <ul className="space-y-3">
+                  {history.map((h) => (
+                    <li key={h.id} className="border rounded p-3 bg-gray-50">
+                      <p className="font-semibold text-gray-800">
+                        {h.user?.name} {h.action}
+                      </p>
+
+                      <p className="text-gray-700 text-sm">{h.description}</p>
+
+                      {/* Loop each changed field */}
+                      <div className="mt-2">
+                        {Object.entries(h.changes || {}).map(([field, [oldVal, newVal]]) => {
+                          const clean = (v) =>
+                            typeof v === "string" ? v.replace("TaskPriority.", "") : v;
+
+                          return (
+                            <p key={field} className="text-sm text-gray-800">
+                              <span className="font-medium capitalize">
+                                {field.replace("_", " ")}
+                              </span>
+                              : {clean(oldVal) ?? "—"} →{" "}
+                              <span className="font-semibold text-green-600">
+                                {clean(newVal) ?? "—"}
+                              </span>
+                            </p>
+                          );
+                        })}
+                      </div>
+
+                      <p className="text-gray-400 text-xs mt-2">
+                        {new Date(h.created_at).toLocaleString()}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+            </div>
+          )}
+        </div>
+
+        {/* TIME LOGS ACCORDION */}
+        <div className="border rounded-lg overflow-hidden">
+          <button
+            onClick={() => toggleAccordion("timelogs")}
+            className="w-full flex justify-between items-center px-4 py-3 bg-gray-100 hover:bg-gray-200 text-left"
+          >
+            <span className="font-semibold text-gray-900">⏱️ Time Logs</span>
+            <span>{openAccordion === "timelogs" ? "▲" : "▼"}</span>
+          </button>
+
+          {openAccordion === "timelogs" && (
+            <div className="p-4 bg-white">
+
+              {loadingLogs ? (
+                <p className="text-gray-500">Loading time logs...</p>
+              ) : timeLogs.length === 0 ? (
+                <p className="text-gray-500">No time logs yet.</p>
+              ) : (
+                <ul className="space-y-3">
+                  {timeLogs.map((log) => (
+                    <li
+                      key={log.id}
+                      className="border rounded p-3 bg-gray-50"
+                    >
+                      <p className="font-semibold text-gray-800">
+                        {log.user?.name || "Unknown User"} logged {log.hours}h
+                      </p>
+
+                      <p className="text-gray-700 text-sm">{log.description}</p>
+
+                      <p className="text-gray-400 text-xs mt-1">
+                        {new Date(log.log_date).toLocaleString()}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+            </div>
+          )}
+        </div>
+
+
       </div>
+
     </div>
   );
 }

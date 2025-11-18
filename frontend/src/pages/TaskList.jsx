@@ -18,13 +18,15 @@ export default function TaskList() {
     due_date: "",
     assignee_id: "",
     project_id: "",
+    priority: "",
+    estimated_hours: "",
   });
   const [projectMembers, setProjectMembers] = useState([]);
 
-
   const { user } = useAuth();
 
-  const canManage = user && ["admin", "manager"].includes(user.role?.name?.toLowerCase());
+  const canManage =
+    user && ["admin", "manager"].includes(user.role?.name?.toLowerCase());
 
   // Load tasks
   useEffect(() => {
@@ -41,7 +43,7 @@ export default function TaskList() {
     fetchTasks();
   }, []);
 
-  // Load users (for assignee dropdown)
+  // Load users
   useEffect(() => {
     if (canManage) {
       api
@@ -51,25 +53,21 @@ export default function TaskList() {
     }
   }, [canManage]);
 
+  // Sort tasks
+  const sortedTasks = useMemo(() => {
+    const statusOrder = { todo: 1, in_progress: 2, done: 3 };
 
-// Sort tasks: always by status + due date
-const sortedTasks = useMemo(() => {
-  const statusOrder = { todo: 1, in_progress: 2, done: 3 };
+    return [...tasks].sort((a, b) => {
+      const statusA = statusOrder[a.status] || 99;
+      const statusB = statusOrder[b.status] || 99;
 
-  return [...tasks].sort((a, b) => {
-    const statusA = statusOrder[a.status] || 99;
-    const statusB = statusOrder[b.status] || 99;
+      if (statusA !== statusB) return statusA - statusB;
 
-    // Sort by status first
-    if (statusA !== statusB) return statusA - statusB;
-
-    // Then sort by due date (earliest first)
-    const dateA = a.due_date ? new Date(a.due_date) : new Date(0);
-    const dateB = b.due_date ? new Date(b.due_date) : new Date(0);
-    return dateA - dateB;
-  });
-}, [tasks]);
-
+      const dateA = a.due_date ? new Date(a.due_date) : new Date(0);
+      const dateB = b.due_date ? new Date(b.due_date) : new Date(0);
+      return dateA - dateB;
+    });
+  }, [tasks]);
 
   // Pagination
   const totalPages = Math.ceil(sortedTasks.length / pageSize);
@@ -78,7 +76,6 @@ const sortedTasks = useMemo(() => {
     currentPage * pageSize
   );
 
-  // Sorting click
   const handleSort = (field) => {
     if (sortBy === field) {
       setSortOrder((prev) => (prev === "asc" ? "desc" : "asc"));
@@ -103,6 +100,7 @@ const sortedTasks = useMemo(() => {
     try {
       await api.put(`/tasks/${editingTask.id}`, editingTask);
       setEditingTask(null);
+
       const updated = await api.get(`/users/me`);
       const userId = updated.data.id;
       const refreshed = await api.get(`/users/${userId}/tasks`);
@@ -114,7 +112,7 @@ const sortedTasks = useMemo(() => {
   };
 
   const handleAddTask = async () => {
-  try {
+    try {
       await api.post("/tasks", newTask);
       setShowTaskForm(false);
       setNewTask({
@@ -124,6 +122,7 @@ const sortedTasks = useMemo(() => {
         assignee_id: "",
         project_id: "",
       });
+
       const res = await api.get(`/users/me`);
       const userId = res.data.id;
       const refreshed = await api.get(`/users/${userId}/tasks`);
@@ -135,276 +134,465 @@ const sortedTasks = useMemo(() => {
   };
 
   const fetchProjectMembers = async (projectId) => {
-  if (!projectId) {
-    setProjectMembers([]);
-    return;
-  }
+    if (!projectId) return setProjectMembers([]);
 
-  try {
-    const res = await api.get(`/projects/${projectId}/members`);
-    setProjectMembers(res.data);
-  } catch (err) {
-    console.error("Error fetching project members:", err);
-    setProjectMembers([]);
-  }
-};
-
-
+    try {
+      const res = await api.get(`/projects/${projectId}/members`);
+      setProjectMembers(res.data);
+    } catch (err) {
+      console.error("Error fetching project members:", err);
+      setProjectMembers([]);
+    }
+  };
 
   return (
-    <div className="max-w-6xl mx-auto mt-8 p-6 bg-white rounded-2xl shadow">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-semibold">
-          {user?.role?.name === "developer" ? "My Tasks" : "All Tasks"}
-        </h2>
-        {canManage && (
-          <button
-            onClick={() => setShowTaskForm(true)}
-            className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700"
-          >
-            + Add Task
-          </button>
+    <>
+      {/* 🟦 MAIN TASK PAGE */}
+      <div className="max-w-6xl mx-auto mt-8 p-6 bg-white rounded-2xl shadow">
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-2xl font-semibold">
+            {user?.role?.name === "developer" ? "My Tasks" : "All Tasks"}
+          </h2>
+          {canManage && (
+            <button
+              onClick={() => setShowTaskForm(true)}
+              className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700"
+            >
+              + Add Task
+            </button>
+          )}
+        </div>
+
+        {/* TABLE */}
+        {tasks.length === 0 ? (
+          <p className="text-gray-500">No tasks assigned yet.</p>
+        ) : (
+          <>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      Title
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      Project
+                    </th>
+                    <th
+                      onClick={() => handleSort("assignee")}
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer"
+                    >
+                      Assignee{" "}
+                      {sortBy === "assignee" &&
+                        (sortOrder === "asc" ? "▲" : "▼")}
+                    </th>
+                    <th
+                      onClick={() => handleSort("status")}
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer"
+                    >
+                      Status{" "}
+                      {sortBy === "status" &&
+                        (sortOrder === "asc" ? "▲" : "▼")}
+                    </th>
+                    <th
+                      onClick={() => handleSort("due_date")}
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer"
+                    >
+                      Due Date{" "}
+                      {sortBy === "due_date" &&
+                        (sortOrder === "asc" ? "▲" : "▼")}
+                    </th>
+                    {canManage && (
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Actions
+                      </th>
+                    )}
+                  </tr>
+                </thead>
+
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {paginatedTasks.map((t) => {
+                    const overdue = isOverdue(t.due_date, t.status);
+                    let dueDateColor = "text-gray-500";
+                    if (t.status === "done") dueDateColor = "text-green-600";
+                    else if (overdue) dueDateColor = "text-red-600";
+
+                    return (
+                      <tr
+                        key={t.id}
+                        className="hover:bg-gray-50 transition cursor-pointer"
+                        onClick={() =>
+                          (window.location.href = `/tasks/${t.id}`)
+                        }
+                      >
+                        <td className="px-6 py-4 text-sm font-medium text-gray-900">
+                          {t.title}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-500">
+                          {t.project?.title || "-"}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-500">
+                          {t.assignee?.name || "Unassigned"}
+                        </td>
+                        <td className="px-6 py-4 text-sm">
+                          <span
+                            className={`px-2 py-1 text-xs font-semibold rounded-full ${t.status === "done"
+                                ? "bg-green-100 text-green-800"
+                                : t.status === "in_progress"
+                                  ? "bg-yellow-100 text-yellow-800"
+                                  : "bg-red-100 text-red-800"
+                              }`}
+                          >
+                            {t.status}
+                          </span>
+                        </td>
+                        <td
+                          className={`px-6 py-4 text-sm font-medium ${dueDateColor}`}
+                        >
+                          {formatDate(t.due_date)}
+                          {t.status !== "done" && overdue && (
+                            <span className="ml-2 inline-flex items-center text-xs font-semibold text-red-600 bg-red-100 px-2 py-0.5 rounded-full">
+                              ⚠️ Overdue
+                            </span>
+                          )}
+                        </td>
+
+                        {canManage && (
+                          <td
+                            className="px-6 py-4 text-sm"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <button
+                              onClick={() =>
+                                setEditingTask({
+                                  ...t,
+                                  assignee_id: t.assignee?.id || "",
+                                })
+                              }
+                              className="text-blue-600 hover:underline mr-3"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => handleDeleteTask(t.id)}
+                              className="text-red-600 hover:underline"
+                            >
+                              Delete
+                            </button>
+                          </td>
+                        )}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination */}
+            <div className="flex justify-between items-center mt-4">
+              <p className="text-sm text-gray-600">
+                Page {currentPage} of {totalPages}
+              </p>
+
+              <div className="space-x-2">
+                <button
+                  onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1 rounded bg-gray-100 hover:bg-gray-200 disabled:opacity-50"
+                >
+                  Prev
+                </button>
+
+                <button
+                  onClick={() =>
+                    setCurrentPage((p) => Math.min(p + 1, totalPages))
+                  }
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1 rounded bg-gray-100 hover:bg-gray-200 disabled:opacity-50"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          </>
         )}
       </div>
 
-      {tasks.length === 0 ? (
-        <p className="text-gray-500">No tasks assigned yet.</p>
-      ) : (
-        <>
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Title</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Project</th>
-                  <th onClick={() => handleSort("assignee")} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer">
-                    Assignee {sortBy === "assignee" && (sortOrder === "asc" ? "▲" : "▼")}
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Assigned By</th>
-                  <th onClick={() => handleSort("status")} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer">
-                    Status {sortBy === "status" && (sortOrder === "asc" ? "▲" : "▼")}
-                  </th>
-                  <th onClick={() => handleSort("due_date")} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer">
-                    Due Date {sortBy === "due_date" && (sortOrder === "asc" ? "▲" : "▼")}
-                  </th>
-                  {canManage && (
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
-                  )}
-                </tr>
-              </thead>
-
-              <tbody className="bg-white divide-y divide-gray-200">
-                {paginatedTasks.map((t) => {
-                  const overdue = isOverdue(t.due_date, t.status);
-                  let dueDateColor = "text-gray-500";
-                  if (t.status === "done") dueDateColor = "text-green-600";
-                  else if (overdue) dueDateColor = "text-red-600";
-
-                  return (
-                    <tr
-                    key={t.id}
-                    className="hover:bg-gray-50 transition cursor-pointer"
-                    onClick={() => (window.location.href = `/tasks/${t.id}`)}
-                    >
-                      <td className="px-6 py-4 text-sm font-medium text-gray-900">{t.title}</td>
-                      <td className="px-6 py-4 text-sm text-gray-500">{t.project?.title || "-"}</td>
-                      <td className="px-6 py-4 text-sm text-gray-500">{t.assignee?.name || "Unassigned"}</td>
-                      <td className="px-6 py-4 text-sm text-gray-500">{t.createdBy?.name || "-"}</td>
-                      <td className="px-6 py-4 text-sm">
-                        <span
-                          className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                            t.status === "done"
-                              ? "bg-green-100 text-green-800"
-                              : t.status === "in_progress"
-                              ? "bg-yellow-100 text-yellow-800"
-                              : "bg-red-100 text-red-800"
-                          }`}
-                        >
-                          {t.status}
-                        </span>
-                      </td>
-                      <td className={`px-6 py-4 text-sm font-medium ${dueDateColor}`}>
-                        {formatDate(t.due_date)}
-                        {t.status !== "done" && overdue && (
-                          <span className="ml-2 inline-flex items-center text-xs font-semibold text-red-600 bg-red-100 px-2 py-0.5 rounded-full">
-                            ⚠️ Overdue
-                          </span>
-                        )}
-                      </td>
-                      {canManage && (
-                        <td className="px-6 py-4 text-sm" onClick={(e) => e.stopPropagation()}>
-                          <button
-                            onClick={() => setEditingTask({ ...t, assignee_id: t.assignee?.id || "" })}
-                            className="text-blue-600 hover:underline mr-3"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => handleDeleteTask(t.id)}
-                            className="text-red-600 hover:underline"
-                          >
-                            Delete
-                          </button>
-                        </td>
-                      )}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Pagination */}
-          <div className="flex justify-between items-center mt-4">
-            <p className="text-sm text-gray-600">
-              Page {currentPage} of {totalPages}
-            </p>
-            <div className="space-x-2">
-              <button
-                onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
-                disabled={currentPage === 1}
-                className="px-3 py-1 rounded bg-gray-100 hover:bg-gray-200 disabled:opacity-50"
-              >
-                Prev
-              </button>
-              <button
-                onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
-                disabled={currentPage === totalPages}
-                className="px-3 py-1 rounded bg-gray-100 hover:bg-gray-200 disabled:opacity-50"
-              >
-                Next
-              </button>
-            </div>
-          </div>
-        </>
-      )}
-
-      {/* Add Task Modal */}
-
+      {/* 🟦 ADD TASK MODAL — OUTSIDE THE BIG WRAPPER */}
       {showTaskForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center">
-          <div className="bg-white rounded-lg p-6 w-96 shadow-lg">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-2xl w-[90%] max-w-lg max-h-[90vh] overflow-y-auto p-6 relative">
             <h3 className="text-xl font-semibold mb-4">Add Task</h3>
-            <input
-              type="text"
-              value={newTask.title}
-              onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
-              placeholder="Title"
-              className="border rounded w-full p-2 mb-3"
-            />
-            <textarea
-              value={newTask.description}
-              onChange={(e) => setNewTask({ ...newTask, description: e.target.value })}
-              placeholder="Description"
-              className="border rounded w-full p-2 mb-3"
-            />
-            <input
-              type="datetime-local"
-              value={newTask.due_date}
-              onChange={(e) => setNewTask({ ...newTask, due_date: e.target.value })}
-              className="border rounded w-full p-2 mb-3"
-            />
-            <select
-              value={newTask.project_id}
-              onChange={(e) => {
-                const selectedProject = e.target.value;
-                setNewTask({ ...newTask, project_id: selectedProject, assignee_id: "" });
-                fetchProjectMembers(selectedProject);
-              }}
-              className="border rounded w-full p-2 mb-4"
-            >
-              <option value="">Select Project</option>
-              {tasks
-                .map((t) => t.project)
-                .filter((p) => p)
-                .reduce((acc, cur) => {
-                  if (!acc.find((x) => x.id === cur.id)) acc.push(cur);
-                  return acc;
-                }, [])
-                .map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.title}
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Title</label>
+                <input
+                  type="text"
+                  value={newTask.title}
+                  onChange={(e) =>
+                    setNewTask({ ...newTask, title: e.target.value })
+                  }
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Description
+                </label>
+                <textarea
+                  value={newTask.description}
+                  onChange={(e) =>
+                    setNewTask({ ...newTask, description: e.target.value })
+                  }
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 h-24 resize-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Due Date
+                </label>
+                <input
+                  type="datetime-local"
+                  value={newTask.due_date}
+                  onChange={(e) =>
+                    setNewTask({ ...newTask, due_date: e.target.value })
+                  }
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Project
+                </label>
+                <select
+                  value={newTask.project_id}
+                  onChange={(e) => {
+                    const projectId = e.target.value;
+                    setNewTask({
+                      ...newTask,
+                      project_id: projectId,
+                      assignee_id: "",
+                    });
+                    fetchProjectMembers(projectId);
+                  }}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                >
+                  <option value="">Select Project</option>
+
+                  {[...new Map(tasks.map((t) => [t.project?.id, t.project]))
+                    .values()]
+                    .filter((p) => p)
+                    .map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.title}
+                      </option>
+                    ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Assignee
+                </label>
+                <select
+                  value={newTask.assignee_id}
+                  disabled={!newTask.project_id}
+                  onChange={(e) =>
+                    setNewTask({ ...newTask, assignee_id: e.target.value })
+                  }
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                >
+                  <option value="">
+                    {newTask.project_id
+                      ? "Select Member"
+                      : "Select project first"}
                   </option>
-                ))}
-            </select>
-          
-            <select
-              value={newTask.assignee_id}
-              onChange={(e) => setNewTask({ ...newTask, assignee_id: e.target.value })}
-              className="border rounded w-full p-2 mb-3"
-              disabled={!newTask.project_id}
-            >
-              <option value="">
-                {newTask.project_id ? "Select member" : "Select a project first"}
-              </option>
-              {projectMembers.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.name} ({m.role?.name})
-                </option>
-              ))}
-            </select>
 
+                  {projectMembers.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.name} ({m.role?.name})
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-            <div className="flex justify-end space-x-2">
-              <button onClick={() => setShowTaskForm(false)} className="bg-gray-200 px-4 py-2 rounded">
-                Cancel
-              </button>
-              <button onClick={handleAddTask} className="bg-blue-600 text-white px-4 py-2 rounded">
-                Add
-              </button>
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Priority
+                </label>
+                <select
+                  value={newTask.priority}
+                  onChange={(e) =>
+                    setNewTask({ ...newTask, priority: e.target.value })
+                  }
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                >
+                  <option value="">Select Priority</option>
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Estimated Hours
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  step="0.5"
+                  value={newTask.estimated_hours}
+                  onChange={(e) =>
+                    setNewTask({
+                      ...newTask,
+                      estimated_hours: e.target.value,
+                    })
+                  }
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 mt-6">
+                <button
+                  onClick={() => setShowTaskForm(false)}
+                  className="bg-gray-200 px-4 py-2 rounded"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleAddTask}
+                  className="bg-blue-600 text-white px-4 py-2 rounded"
+                >
+                  Add
+                </button>
+              </div>
             </div>
           </div>
         </div>
       )}
 
-
-      {/* ✅ Edit Task Modal */}
+      {/* 🟦 EDIT TASK MODAL — OUTSIDE MAIN WRAPPER */}
       {editingTask && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center">
-          <div className="bg-white rounded-lg p-6 w-96 shadow-lg">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-2xl w-[90%] max-w-lg max-h-[90vh] overflow-y-auto p-6 relative">
             <h3 className="text-xl font-semibold mb-4">Edit Task</h3>
-            <input
-              type="text"
-              value={editingTask.title}
-              onChange={(e) => setEditingTask({ ...editingTask, title: e.target.value })}
-              placeholder="Title"
-              className="border rounded w-full p-2 mb-3"
-            />
-            <textarea
-              value={editingTask.description}
-              onChange={(e) => setEditingTask({ ...editingTask, description: e.target.value })}
-              placeholder="Description"
-              className="border rounded w-full p-2 mb-3"
-            />
-            <input
-              type="datetime-local"
-              value={editingTask.due_date || ""}
-              onChange={(e) => setEditingTask({ ...editingTask, due_date: e.target.value })}
-              className="border rounded w-full p-2 mb-3"
-            />
-            <select
-              value={editingTask.assignee_id || ""}
-              onChange={(e) => setEditingTask({ ...editingTask, assignee_id: e.target.value })}
-              className="border rounded w-full p-2 mb-4"
-            >
-              <option value="">Assign to</option>
-              {users.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.name} ({u.role?.name})
-                </option>
-              ))}
-            </select>
-            <div className="flex justify-end space-x-2">
-              <button onClick={() => setEditingTask(null)} className="bg-gray-200 px-4 py-2 rounded">
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Title
+                </label>
+                <input
+                  type="text"
+                  value={editingTask.title}
+                  onChange={(e) =>
+                    setEditingTask({ ...editingTask, title: e.target.value })
+                  }
+                  className="border rounded w-full p-2 mb-3"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Description
+                </label>
+                <textarea
+                  value={editingTask.description}
+                  onChange={(e) =>
+                    setEditingTask({ ...editingTask, description: e.target.value })
+                  }
+                  className="border rounded w-full p-2 mb-3"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Due date
+                </label>
+                <input
+                  type="datetime-local"
+                  value={editingTask.due_date || ""}
+                  onChange={(e) =>
+                    setEditingTask({ ...editingTask, due_date: e.target.value })
+                  }
+                  className="border rounded w-full p-2 mb-3"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Asignee
+                </label>
+                <select
+                  value={editingTask.assignee_id || ""}
+                  onChange={(e) =>
+                    setEditingTask({ ...editingTask, assignee_id: e.target.value })
+                  }
+                  className="border rounded w-full p-2 mb-3"
+                >
+                  <option value="">Assign to</option>
+                  {users.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.name} ({u.role?.name})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Priority
+                </label>
+                <select
+                  value={editingTask.priority || ""}
+                  onChange={(e) =>
+                    setEditingTask({ ...editingTask, priority: e.target.value })
+                  }
+                  className="border rounded w-full p-2 mb-3"
+                >
+                  <option value="">Select Priority</option>
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Estimated Hours
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  step="0.5"
+                  value={editingTask.estimated_hours || ""}
+                  onChange={(e) =>
+                    setEditingTask({
+                      ...editingTask,
+                      estimated_hours: e.target.value,
+                    })
+                  }
+                  className="border rounded w-full p-2 mb-3"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setEditingTask(null)}
+                className="bg-gray-200 px-4 py-2 rounded"
+              >
                 Cancel
               </button>
-              <button onClick={handleEditTask} className="bg-blue-600 text-white px-4 py-2 rounded">
+              <button
+                onClick={handleEditTask}
+                className="bg-blue-600 text-white px-4 py-2 rounded"
+              >
                 Save
               </button>
             </div>
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }

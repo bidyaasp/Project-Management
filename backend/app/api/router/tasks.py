@@ -5,6 +5,7 @@ from app.db.database import get_db
 from app.deps import get_current_user
 from datetime import datetime
 from typing import Optional
+from app.utils.task_history_utils import log_task_history
 
 router = APIRouter()
 
@@ -38,6 +39,8 @@ def create_task(
         title=task_in.title,
         description=task_in.description,
         due_date=task_in.due_date,
+        priority=task_in.priority,
+        estimated_hours=task_in.estimated_hours,
         project=project
     )
 
@@ -54,6 +57,16 @@ def create_task(
     db.add(task)
     db.commit()
     db.refresh(task)
+
+    # Log task history
+    log_task_history(
+        db=db,
+        task=task,
+        user=current_user,
+        action=models.HistoryAction.created,
+        description=f"Task '{task.title}' created by {current_user.name}"
+    )
+
     return task
 
 @router.get("/{task_id}", response_model=schemas.TaskDetails)
@@ -124,19 +137,38 @@ def update_task(
     if current_user.role.name not in ('admin', 'manager'):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not permitted")
 
-    for field in ["title", "description", "due_date", "assignee_id"]:
-        value = getattr(task_in, field, None)
-        if value is not None:
-            if field == "assignee_id":
-                assignee = db.query(models.User).filter(models.User.id == value).first()
-                if assignee:
-                    task.assignee = assignee
-            else:
-                setattr(task, field, value)
+    # Convert pydantic model to dict and filter out None values
+    update_data = task_in.dict(exclude_unset=True)
+
+    # Detect changes before applying
+    from app.utils.task_history_utils import detect_task_changes
+    changes = detect_task_changes(task, update_data)
+
+    # Apply updates
+    for field, value in update_data.items():
+        if field == "assignee_id" and value is not None:
+            assignee = db.query(models.User).filter(models.User.id == value).first()
+            if assignee:
+                task.assignee = assignee
+        else:
+            setattr(task, field, value)
 
     db.commit()
     db.refresh(task)
+
+    # Log history if there were any changes
+    if changes:
+        log_task_history(
+            db=db,
+            task=task,
+            user=current_user,
+            action=models.HistoryAction.updated,
+            changes=changes,
+            description=f"Task updated by {current_user.name}"
+        )
+
     return task
+
 
 # -----------------------------
 # Update Task Status
@@ -156,13 +188,28 @@ def update_task_status(
         raise HTTPException(status_code=403, detail='Not permitted')
 
     new_status = status_in.get('status')
-    if new_status not in ('todo', 'in_progress', 'done'):
+    if new_status not in [e.value for e in models.TaskStatus]:
         raise HTTPException(status_code=400, detail='Invalid status')
 
-    task.status = new_status
-    db.commit()
-    db.refresh(task)
+    old_status = task.status
+    if old_status != new_status:
+        task.status = new_status
+        db.commit()
+        db.refresh(task)
+
+        log_task_history(
+            db=db,
+            task=task,
+            user=current_user,
+            action=models.HistoryAction.status_changed,
+            field_name="status",
+            old_value=old_status,
+            new_value=new_status,
+            description=f"Status changed from '{old_status}' to '{new_status}' by {current_user.name}"
+        )
+
     return {"ok": True, "status": task.status}
+
 
 # -----------------------------
 # Update Task Deadline
@@ -185,9 +232,22 @@ def update_task_deadline(
     if not due_date:
         raise HTTPException(status_code=400, detail="Missing due_date")
 
+    old_value = str(task.due_date)
     task.due_date = due_date
     db.commit()
     db.refresh(task)
+
+    log_task_history(
+        db=db,
+        task=task,
+        user=current_user,
+        action=models.HistoryAction.updated,
+        field_name="due_date",
+        old_value=old_value,
+        new_value=str(due_date),
+        description=f"Deadline updated by {current_user.name}"
+    )
+
     return {"ok": True, "task_id": task.id, "due_date": task.due_date}
 
 # -----------------------------
@@ -209,3 +269,22 @@ def delete_task(
     db.delete(task)
     db.commit()
     return {"ok": True, "message": "Task deleted successfully"}
+
+
+def get_task_history(db: Session, task_id: int):
+    return (
+        db.query(models.TaskHistory)
+        .filter(models.TaskHistory.task_id == task_id)
+        .order_by(models.TaskHistory.created_at.desc())
+        .all()
+    )
+
+@router.get("/{task_id}/history", response_model=list[schemas.TaskHistoryResponse])
+def get_task_history_endpoint(
+    task_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    # Optional: check if user can view the task
+    history = get_task_history(db, task_id)
+    return history
