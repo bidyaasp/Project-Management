@@ -16,7 +16,6 @@ export function AuthProvider({ children }) {
     const autoLogout = () => logout()
 
     window.addEventListener('pm_force_logout', autoLogout)
-
     return () => window.removeEventListener('pm_force_logout', autoLogout)
   }, [])
 
@@ -29,6 +28,7 @@ export function AuthProvider({ children }) {
     const me = await api.get('/users/me', {
       headers: { Authorization: `Bearer ${jwt}` }
     })
+
     setUser(me.data)
     localStorage.setItem('pm_user', JSON.stringify(me.data))
   }
@@ -41,7 +41,7 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout }}>
+    <AuthContext.Provider value={{ user, setUser, token, login, logout }}>
       {children}
     </AuthContext.Provider>
   )

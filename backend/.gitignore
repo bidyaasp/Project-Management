@@ -71,3 +71,6 @@ docker-compose.override.yml
 # Alembic
 # ────────────────
 alembic/versions/*.pyc
+
+static/avatars/*
+!static/avatars/.gitkeep

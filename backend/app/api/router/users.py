@@ -1,5 +1,6 @@
+import shutil
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 from app.db import models, schemas
 from app.db.database import get_db
@@ -84,7 +85,7 @@ def user_tasks(user_id: int, db: Session = Depends(get_db), current_user: models
 
 
 @router.get("/{user_id}/assigned-tasks", response_model=list[schemas.TaskDetails])
-def user_tasks(user_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+def user_assigned_tasks(user_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     role = current_user.role.name.lower()
     if role == "developer":
         raise HTTPException(
@@ -136,3 +137,74 @@ def toggle_user_activation(
     db.refresh(user)
 
     return user
+
+
+@router.post("/{user_id}/avatar")
+async def upload_avatar(
+    user_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    # Optional: allow only the user or admin to change
+    if current_user.id != user_id and current_user.role.name.lower() != "admin":
+        raise HTTPException(status_code=403, detail="Not allowed")
+
+    # Validate file type
+    allowed_types = ["image/jpeg", "image/png", "image/webp"]
+    if file.content_type not in allowed_types:
+        raise HTTPException(400, "Invalid image type")
+
+    # File path
+    ext = file.filename.split(".")[-1]
+    file_name = f"user_{user_id}.{ext}"
+    file_path = f"static/avatars/{file_name}"
+
+    # Save file
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+
+    # Update DB
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    user.avatar = f"/static/avatars/{file_name}"
+    db.commit()
+    db.refresh(user)
+
+    return {"avatar_url": user.avatar}
+
+
+@router.delete("/{user_id}/avatar")
+async def delete_avatar(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    # Allow only the user or admin
+    if current_user.id != user_id and current_user.role.name.lower() != "admin":
+        raise HTTPException(status_code=403, detail="Not allowed")
+
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # If no avatar exists — nothing to delete
+    if not user.avatar:
+        return {"detail": "No avatar to delete"}
+
+    # Build full path
+    file_path = f".{user.avatar}"  # avatar stores like /static/avatars/user_1.png
+
+    # Remove file if exists
+    try:
+        import os
+        if os.path.exists(file_path):
+            os.remove(file_path)
+    except Exception as e:
+        raise HTTPException(500, f"Failed to delete avatar: {str(e)}")
+
+    # Update DB
+    user.avatar = None
+    db.commit()
+    db.refresh(user)
+
+    return {"detail": "Avatar removed successfully", "avatar_url": None}

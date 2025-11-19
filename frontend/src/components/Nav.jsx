@@ -1,6 +1,7 @@
 import React from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import UserAvatar from "../components/UserAvatar";
 
 export default function Nav() {
   const { user, logout } = useAuth()
@@ -12,6 +13,7 @@ export default function Nav() {
   return (
     <nav className="bg-white shadow-sm border-b border-gray-200">
       <div className="container mx-auto flex justify-between items-center py-4 px-6">
+
         {/* Left section */}
         <div className="flex items-center gap-6">
           <Link
@@ -69,6 +71,10 @@ export default function Nav() {
         <div className="flex items-center gap-3">
           {user && (
             <div className="flex items-center gap-4">
+
+              <UserAvatar user={user} size={36} />
+
+              {/* Welcome Text */}
               <span className="text-gray-800 flex items-center gap-2">
                 Welcome, <strong>{user.name}</strong>
                 <span
@@ -82,6 +88,7 @@ export default function Nav() {
                 </span>
               </span>
 
+              {/* Logout */}
               <button
                 onClick={() => {
                   logout()

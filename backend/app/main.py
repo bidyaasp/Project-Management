@@ -5,6 +5,7 @@ from app.db import models
 from app.db.database import engine
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
+from fastapi.staticfiles import StaticFiles
 
 app = FastAPI(title="Project Management API", version="0.1.0")
 
@@ -19,6 +20,8 @@ app.add_middleware(
 
 # Include your API router
 app.include_router(api_router, prefix="/api")
+
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # ✅ Create all tables
 models.Base.metadata.create_all(bind=engine)

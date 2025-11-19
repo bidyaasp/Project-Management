@@ -2,6 +2,7 @@ import React, { useEffect, useState, useMemo } from "react";
 import api from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import { formatDate, isOverdue } from "../utils/dateUtils";
+import { useParams, useNavigate } from "react-router-dom";
 
 export default function TaskList() {
   const [tasks, setTasks] = useState([]);
@@ -24,6 +25,8 @@ export default function TaskList() {
   const [projectMembers, setProjectMembers] = useState([]);
 
   const { user } = useAuth();
+
+  const navigate = useNavigate();
 
   const canManage =
     user && ["admin", "manager"].includes(user.role?.name?.toLowerCase());
@@ -239,10 +242,8 @@ const sortedTasks = useMemo(() => {
                     return (
                       <tr
                         key={t.id}
-                        className="hover:bg-gray-50 transition cursor-pointer"
-                        onClick={() =>
-                          (window.location.href = `/tasks/${t.id}`)
-                        }
+                        className="border-t hover:bg-gray-50 cursor-pointer transition-colors"
+                        onClick={() => navigate(`/tasks/${t.id}`, { state: { from: "task_list" } })}
                       >
                         <td className="px-6 py-4 text-sm font-medium text-gray-900">
                           {t.title}
@@ -255,14 +256,14 @@ const sortedTasks = useMemo(() => {
                         </td>
                         <td className="px-6 py-4 text-sm">
                           <span
-                            className={`px-2 py-1 text-xs font-semibold rounded-full ${t.status === "done"
+                            className={`px-2 py-1 text-xs font-medium rounded-full ${t.status === "done"
                               ? "bg-green-100 text-green-800"
                               : t.status === "in_progress"
                                 ? "bg-yellow-100 text-yellow-800"
-                                : "bg-red-100 text-red-800"
+                                : "bg-gray-100 text-gray-800"
                               }`}
                           >
-                            {t.status}
+                            {t.status.replace("_", " ").toUpperCase()}
                           </span>
                         </td>
                         <td

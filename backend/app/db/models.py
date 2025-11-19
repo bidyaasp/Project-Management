@@ -55,6 +55,7 @@ class User(Base):
     hashed_password = Column(String(255), nullable=False)
     role_id = Column(Integer, ForeignKey('roles.id'))
     is_active = Column(Boolean, default=True)
+    avatar = Column(String(255), nullable=True)  # store avatar URL or path
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     created_by_id = Column(Integer, ForeignKey('users.id'), nullable=True)  # nullable for first admin
 

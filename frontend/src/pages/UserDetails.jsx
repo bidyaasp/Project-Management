@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import api from "../services/api";
 import { useAuth } from "../context/AuthContext";
+import UserAvatar from "../components/UserAvatar";
 
 export default function UserDetails() {
   const { id } = useParams();
@@ -61,6 +62,17 @@ export default function UserDetails() {
     }
   };
 
+  const handleDelete = async () => {
+    if (!window.confirm("Are you sure you want to delete this user?")) return;
+    try {
+      await api.delete(`/users/${id}`);
+      // Go back to Users list
+      navigate("/users", { replace: true });
+    } catch {
+      alert("Failed to delete user.");
+    }
+  };
+
   if (!user) {
     return (
       <div className="flex justify-center items-center h-40">
@@ -81,9 +93,21 @@ export default function UserDetails() {
 
       {/* 🧾 User Card */}
       <div className="bg-white p-8 rounded-2xl shadow-lg max-w-xl mx-auto border border-gray-200">
-        <h1 className="text-3xl font-bold mb-6 text-gray-800 border-b pb-3">
-          {user.name}
-        </h1>
+        {/* Avatar + Name */}
+        <div className="flex items-center gap-4 mb-6">
+          <UserAvatar
+            user={user}
+            size={55}       // smaller but still clear
+            fontSize={20}   // clean initials
+          />
+
+          <div>
+            <h1 className="text-2xl font-bold text-gray-800">{user.name}</h1>
+            <p className="text-sm text-gray-500 capitalize">{user.role?.name}</p>
+          </div>
+        </div>
+
+        <hr className="mb-4" />
 
         <div className="space-y-4 text-gray-700 text-base">
           <p>
@@ -125,21 +149,32 @@ export default function UserDetails() {
         {/* 🔘 Toggle Activation Button (Admin Only) */}
         {isAdmin && currentUser.id !== user.id && (
           <div className="mt-6 text-center">
-            <button
-              onClick={toggleActivation}
-              disabled={loading}
-              className={`px-6 py-2 rounded-lg font-semibold text-white ${
-                user.is_active
+            <div className="flex items-center gap-3 mt-4">
+              <button
+                onClick={toggleActivation}
+                disabled={loading}
+                className={`px-4 py-2 rounded-md font-medium text-white transition ${user.is_active
                   ? "bg-red-600 hover:bg-red-700"
                   : "bg-green-600 hover:bg-green-700"
-              } ${loading ? "opacity-60 cursor-not-allowed" : ""}`}
-            >
-              {loading
-                ? "Processing..."
-                : user.is_active
-                ? "Deactivate User"
-                : "Activate User"}
-            </button>
+                  } ${loading ? "opacity-60 cursor-not-allowed" : ""}`}
+              >
+                {loading
+                  ? "Processing..."
+                  : user.is_active
+                    ? "Deactivate"
+                    : "Activate"}
+              </button>
+
+              {isAdmin && currentUser.id !== user.id && (
+                <button
+                  onClick={handleDelete}
+                  className="px-4 py-2 rounded-md font-medium bg-red-600 text-white hover:bg-red-700 transition"
+                >
+                  Delete
+                </button>
+              )}
+            </div>
+
           </div>
         )}
       </div>
@@ -175,7 +210,9 @@ export default function UserDetails() {
                   const overdue =
                     t.due_date && new Date(t.due_date) < new Date() && t.status !== "done";
                   return (
-                    <tr key={t.id} className="border-t hover:bg-gray-50 transition">
+                    <tr key={t.id} className="border-t hover:bg-gray-50 cursor-pointer transition-colors"
+                      onClick={() => navigate(`/tasks/${t.id}`, { state: { from: "user", userId: user.id } })} // ✅ navigate to task details
+                    >
                       {/* 🏷️ Task Title */}
                       <td className="px-4 py-2 text-sm font-medium text-gray-800">
                         {t.title}
@@ -193,16 +230,17 @@ export default function UserDetails() {
                       </td>
 
                       {/* 📊 Status */}
-                      <td
-                        className={`px-4 py-2 text-sm font-medium ${
-                          t.status === "done"
-                            ? "text-green-600"
-                            : overdue
-                            ? "text-red-600"
-                            : "text-gray-700"
-                        }`}
-                      >
-                        {t.status}
+                      <td className="px-4 py-2 text-sm text-gray-700">
+                        <span
+                          className={`px-2 py-1 text-xs font-medium rounded-full ${t.status === "done"
+                            ? "bg-green-100 text-green-800"
+                            : t.status === "in_progress"
+                              ? "bg-yellow-100 text-yellow-800"
+                              : "bg-gray-100 text-gray-800"
+                            }`}
+                        >
+                          {t.status.replace("_", " ").toUpperCase()}
+                        </span>
                       </td>
 
                       {/* 📅 Due Date */}

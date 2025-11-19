@@ -3,6 +3,7 @@ import { useAuth } from "../context/AuthContext";
 import api from "../services/api";
 import { useNavigate } from "react-router-dom";
 import UserCreateModal from "../components/UserCreateModal";
+import UserAvatar from "../components/UserAvatar";
 
 export default function Users() {
   const [users, setUsers] = useState([]);
@@ -18,16 +19,6 @@ export default function Users() {
     api.get("/users/").then((r) => setUsers(r.data)).catch(console.error);
     api.get("/roles/").then((r) => setRoles(r.data)).catch(console.error);  // fetch roles here
   }, []);
-
-  const handleDelete = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this user?")) return;
-    try {
-      await api.delete(`/users/${id}`);
-      setUsers((prev) => prev.filter((u) => u.id !== id));
-    } catch {
-      alert("Failed to delete user.");
-    }
-  };
 
   return (
     <div className="max-w-5xl mx-auto mt-10 bg-white p-6 rounded-2xl shadow">
@@ -48,56 +39,57 @@ export default function Users() {
         <p className="text-gray-500 text-center">No users found.</p>
       ) : (
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200 border rounded-lg">
+          <table className="min-w-full divide-y divide-gray-200 border rounded-lg text-sm">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
-                  Name
+                <th className="px-4 py-2 text-left font-semibold text-gray-600 uppercase text-xs">
+                  User
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
-                  Email
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
+                <th className="px-4 py-2 text-left font-semibold text-gray-600 uppercase text-xs">
                   Role
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
+                <th className="px-4 py-2 text-left font-semibold text-gray-600 uppercase text-xs">
                   Status
-                </th>                
-                {(isAdmin) && (
-                  <th className="px-6 py-3 text-right text-xs font-semibold text-gray-600 uppercase">
-                    Actions
-                  </th>
-                )}
+                </th>
               </tr>
             </thead>
+
             <tbody className="bg-white divide-y divide-gray-100">
               {users.map((u, idx) => (
                 <tr
                   key={u.id}
-                  className={`hover:bg-gray-50 transition ${
-                    idx % 2 === 0 ? "bg-gray-50/30" : ""
-                  }`}
+                  className={`hover:bg-gray-50 transition ${idx % 2 === 0 ? "bg-gray-50/20" : ""}`}
                 >
+                  {/* User */}
                   <td
-                    className="px-6 py-4 text-sm font-medium text-gray-900 cursor-pointer hover:text-blue-600"
+                    className="px-4 py-2 cursor-pointer"
                     onClick={() => nav(`/users/${u.id}`)}
                   >
-                    {u.name}
+                    <div className="flex items-center gap-2">
+                      <UserAvatar user={u} size={28} fontSize={11} />
+
+                      <div>
+                        <p className="font-medium text-gray-900 leading-tight hover:text-blue-600">
+                          {u.name}
+                        </p>
+                        <p className="text-xs text-gray-500 leading-tight">
+                          {u.email}
+                        </p>
+                      </div>
+                    </div>
                   </td>
+
+                  {/* Role */}
                   <td
-                    className="px-6 py-4 text-sm text-gray-700 cursor-pointer"
-                    onClick={() => nav(`/users/${u.id}`)}
-                  >
-                    {u.email}
-                  </td>
-                  <td
-                    className="px-6 py-4 text-sm text-gray-600 italic cursor-pointer"
+                    className="px-4 py-2 text-gray-700 cursor-pointer leading-tight"
                     onClick={() => nav(`/users/${u.id}`)}
                   >
                     {u.role?.name || "-"}
                   </td>
+
+                  {/* Status */}
                   <td
-                    className="px-6 py-4 text-sm text-gray-600 italic cursor-pointer"
+                    className="px-4 py-2 cursor-pointer leading-tight"
                     onClick={() => nav(`/users/${u.id}`)}
                   >
                     {u.is_active ? (
@@ -105,22 +97,13 @@ export default function Users() {
                     ) : (
                       <span className="text-red-600 font-medium">Inactive</span>
                     )}
-                  </td>                  
-                  {(isAdmin) && u.id !== user.id && (
-                    <td className="px-6 py-4 text-right">
-                      <button
-                        onClick={() => handleDelete(u.id)}
-                        className="bg-red-500 text-white px-3 py-1.5 text-sm rounded-md hover:bg-red-600 shadow-sm transition"
-                      >
-                        Delete
-                      </button>
-                    </td>
-                  )}
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+
       )}
 
       {/* ✅ Modal */}

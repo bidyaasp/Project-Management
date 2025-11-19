@@ -3,6 +3,7 @@ import { useParams, useLocation, Link } from "react-router-dom";
 import api from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import { formatDate, isOverdue } from "../utils/dateUtils";
+import UserAvatar from "../components/UserAvatar";
 
 export default function TaskDetails() {
   const { id } = useParams();
@@ -249,9 +250,15 @@ export default function TaskDetails() {
       <p className="text-gray-500 p-6 text-center">Loading task details...</p>
     );
 
-  const backLink = location.state?.projectId
-    ? `/projects/${location.state.projectId}`
-    : "/tasks";
+  let backLink = "/tasks"; // default
+
+  if (location.state?.from === "project") {
+    backLink = `/projects/${location.state.projectId}`;
+  } else if (location.state?.from === "user") {
+    backLink = `/users/${location.state.userId}`;
+  } else if (location.state?.from === "task_list") {
+    backLink = "/tasks";
+  }
 
   const isAssignee =
     user?.role?.name === "developer"
@@ -295,7 +302,7 @@ export default function TaskDetails() {
 
 
       <p className="text-gray-700 mb-6">
-        {task.description || "No description provided."}
+        {task.description || ""}
       </p>
 
       {/* --- Task Info --- */}
@@ -669,13 +676,24 @@ export default function TaskDetails() {
                       key={c.id}
                       className="border rounded p-3 bg-gray-50 flex justify-between items-start"
                     >
-                      <div>
-                        <p className="font-semibold text-gray-800">{c.author.name}</p>
-                        <p className="text-gray-700">{c.content}</p>
-                        <p className="text-gray-400 text-xs">
-                          {new Date(c.created_at).toLocaleString()}
-                        </p>
+                      <div className="flex gap-2 py-2 border-b border-gray-100">
+                        {/* Avatar */}
+                        <UserAvatar user={c.author} size={32} fontSize={12} />
+
+                        {/* Right Block */}
+                        <div className="flex-1">
+                          <div className="flex items-center gap-1">
+                            <span className="font-semibold text-gray-900 text-sm">{c.author.name}</span>
+                            <span className="text-xs text-gray-400">• {new Date(c.created_at).toLocaleString()}</span>
+                          </div>
+
+                          <p className="text-gray-700 text-sm mt-0.5 leading-snug">
+                            {c.content}
+                          </p>
+                        </div>
                       </div>
+
+
                       {c.author?.id === user?.id && (
                         <button
                           onClick={() => handleDeleteComment(c.id)}
@@ -703,7 +721,7 @@ export default function TaskDetails() {
           </button>
 
           {openAccordion === "history" && (
-            <div className="p-4 bg-white">
+            <div className="max-h-72 overflow-y-auto">
 
               {loadingHistory ? (
                 <p className="text-gray-500">Loading history...</p>
@@ -712,38 +730,50 @@ export default function TaskDetails() {
               ) : (
                 <ul className="space-y-3">
                   {history.map((h) => (
-                    <li key={h.id} className="border rounded p-3 bg-gray-50">
-                      <p className="font-semibold text-gray-800">
-                        {h.user?.name} {h.action}
-                      </p>
+                    <li key={h.id} className="border rounded p-3 bg-gray-50 space-y-2">
 
-                      <p className="text-gray-700 text-sm">{h.description}</p>
-
-                      {/* Loop each changed field */}
-                      <div className="mt-2">
-                        {Object.entries(h.changes || {}).map(([field, [oldVal, newVal]]) => {
-                          const clean = (v) =>
-                            typeof v === "string" ? v.replace("TaskPriority.", "") : v;
-
-                          return (
-                            <p key={field} className="text-sm text-gray-800">
-                              <span className="font-medium capitalize">
-                                {field.replace("_", " ")}
-                              </span>
-                              : {clean(oldVal) ?? "—"} →{" "}
-                              <span className="font-semibold text-green-600">
-                                {clean(newVal) ?? "—"}
-                              </span>
-                            </p>
-                          );
-                        })}
+                      {/* Header Row: Avatar + Name + Action */}
+                      <div className="flex items-center gap-2">
+                        <UserAvatar user={h.user} size={28} fontSize={12} />
+                        <p className="font-semibold text-gray-800">
+                          {h.user?.name} {h.action}
+                        </p>
                       </div>
 
-                      <p className="text-gray-400 text-xs mt-2">
+                      {/* Description */}
+                      {h.description && (
+                        <p className="text-gray-700 text-sm leading-tight">{h.description}</p>
+                      )}
+
+                      {/* Field Changes */}
+                      {h.changes && (
+                        <div className="space-y-1">
+                          {Object.entries(h.changes).map(([field, [oldVal, newVal]]) => {
+                            const clean = (v) =>
+                              typeof v === "string" ? v.replace("TaskPriority.", "") : v;
+
+                            return (
+                              <p key={field} className="text-sm text-gray-800 leading-tight">
+                                <span className="font-medium capitalize">
+                                  {field.replace("_", " ")}
+                                </span>
+                                : {clean(oldVal) ?? "—"} →{" "}
+                                <span className="font-semibold text-green-600">
+                                  {clean(newVal) ?? "—"}
+                                </span>
+                              </p>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {/* Timestamp */}
+                      <p className="text-gray-400 text-xs">
                         {new Date(h.created_at).toLocaleString()}
                       </p>
                     </li>
                   ))}
+
                 </ul>
               )}
 
@@ -762,7 +792,7 @@ export default function TaskDetails() {
           </button>
 
           {openAccordion === "timelogs" && (
-            <div className="p-4 bg-white">
+            <div className="max-h-72 overflow-y-auto">
 
               {loadingLogs ? (
                 <p className="text-gray-500">Loading time logs...</p>
@@ -773,29 +803,38 @@ export default function TaskDetails() {
                   {timeLogs.map((log) => (
                     <li
                       key={log.id}
-                      className="border rounded p-3 bg-gray-50"
+                      className="border rounded p-3 bg-gray-50 space-y-2"
                     >
-                      <p className="font-semibold text-gray-800">
-                        {log.user?.name || "Unknown User"} logged {log.hours}h
-                      </p>
 
-                      <p className="text-gray-700 text-sm">{log.description}</p>
+                      {/* Avatar + Name + Hours */}
+                      <div className="flex items-center gap-2">
+                        <UserAvatar user={log.user} size={28} fontSize={12} />
 
-                      <p className="text-gray-400 text-xs mt-1">
+                        <p className="font-semibold text-gray-800 leading-tight">
+                          {log.user?.name || "Unknown User"} logged {log.hours}h
+                        </p>
+                      </div>
+
+                      {/* Description */}
+                      {log.description && (
+                        <p className="text-gray-700 text-sm leading-tight">
+                          {log.description}
+                        </p>
+                      )}
+
+                      {/* Timestamp */}
+                      <p className="text-gray-400 text-xs leading-tight">
                         {new Date(log.log_date).toLocaleString()}
                       </p>
                     </li>
                   ))}
                 </ul>
-              )}
 
+              )}
             </div>
           )}
         </div>
-
-
       </div>
-
     </div>
   );
 }

@@ -37,6 +37,7 @@ class UserOut(BaseModel):
     is_active: Optional[bool] = True  # optional
     created_at: Optional[datetime] = None
     creator: Optional["UserMini"] = None  # 👈 Add this (nested object)
+    avatar: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -49,6 +50,7 @@ class UserMini(BaseModel):
     id: int
     name: str
     email: str
+    avatar: Optional[str] = None
 
     class Config:
         from_attributes = True  # or from_attributes = True for Pydantic v1    
@@ -89,6 +91,7 @@ class ProjectMember(BaseModel):
     name: str
     email: str
     role: RoleOut
+    avatar: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -214,14 +217,6 @@ class TimeLogOut(TimeLogBase):
         from_attributes = True
 
 
-class HistoryUser(BaseModel):
-    id: int
-    name: str
-
-    class Config:
-        from_attributes = True
-
-
 class TaskHistoryResponse(BaseModel):
     id: int
     action: str
@@ -231,7 +226,7 @@ class TaskHistoryResponse(BaseModel):
     description: Optional[str] = None
     changes: Optional[dict] = None
     created_at: datetime
-    user: Optional[HistoryUser] = None   # user, not changed_by
+    user: Optional[UserMini] = None   # user, not changed_by
 
     class Config:
         from_attributes = True

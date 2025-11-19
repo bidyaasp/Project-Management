@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import api from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import { formatDate, isOverdue } from "../utils/dateUtils";
+import UserAvatar from "../components/UserAvatar";
 
 export default function ProjectDetail() {
   const { id } = useParams();
@@ -277,13 +278,24 @@ export default function ProjectDetail() {
         {project.members?.length > 0 ? (
           <ul className="divide-y divide-gray-200">
             {project.members.map((m) => (
-              <li key={m.id} className="py-2 flex justify-between items-center">
-                <div>
-                  <div className="font-medium text-gray-900">
-                    {m.name} <span className="text-sm text-gray-500">({m.role?.name})</span>
+              <li
+                key={m.id}
+                className="py-2 flex justify-between items-center"
+              >
+                <div className="flex items-center gap-3">
+                  {/* Avatar */}
+                  <UserAvatar user={m} size={32} fontSize={14} />
+
+                  {/* Name + Role + Email */}
+                  <div>
+                    <div className="font-medium text-gray-900 flex items-center gap-1">
+                      {m.name}
+                      <span className="text-sm text-gray-500">({m.role?.name})</span>
+                    </div>
+                    <div className="text-sm text-gray-600">{m.email}</div>
                   </div>
-                  <div className="text-sm text-gray-600">{m.email}</div>
                 </div>
+
                 {canManage && (
                   <button
                     onClick={() => handleDeleteMember(m.id)}
@@ -330,8 +342,8 @@ export default function ProjectDetail() {
                 {project.tasks.map((t) => (
                   <tr
                     key={t.id}
-                    className="hover:bg-gray-50 cursor-pointer"
-                    onClick={() => navigate(`/tasks/${t.id}`, { state: { projectId: project.id } })} // ✅ navigate to task details
+                    className="border-t hover:bg-gray-50 cursor-pointer transition-colors"
+                    onClick={() => navigate(`/tasks/${t.id}`, { state: { from: "project", projectId: project.id } })} // ✅ navigate to task details
                   >
                     <td className="px-4 py-2 text-sm text-gray-900">{t.title}</td>
                     <td className="px-4 py-2 text-sm text-gray-700">{t.assignee?.name || "-"}</td>
@@ -397,15 +409,15 @@ export default function ProjectDetail() {
 
       {/* ────────────── Project History ────────────── */}
       <div className="bg-white p-4 rounded-lg shadow mt-6">
-      <div
-        className="flex justify-between items-center mb-3 cursor-pointer"
-        onClick={() => toggleAccordion("history")}
-      >
-        <h2 className="text-xl font-semibold">Project History</h2>
-        <span className="text-blue-600 text-sm hover:underline">
-          {openAccordion === "history" ? "▲" : "▼"}
-        </span>
-      </div>
+        <div
+          className="flex justify-between items-center mb-3 cursor-pointer"
+          onClick={() => toggleAccordion("history")}
+        >
+          <h2 className="text-xl font-semibold">Project History</h2>
+          <span className="text-blue-600 text-sm hover:underline">
+            {openAccordion === "history" ? "▲" : "▼"}
+          </span>
+        </div>
 
         {openAccordion === "history" && (
           <div className="max-h-72 overflow-y-auto">
@@ -417,26 +429,36 @@ export default function ProjectDetail() {
               <ul className="divide-y divide-gray-200">
                 {projectHistory.map((h) => (
                   <li key={h.id} className="py-2">
-                    <p className="text-sm text-gray-700">
-                      <span className="font-medium">{h.user?.name || "System"}</span>{" "}
-                      {
-                        <>
-                        
-                          {h.action.replace("_", " ").toLowerCase()}{" "} 
+
+                    {/* Avatar + Name + Action */}
+                    <div className="flex items-start gap-2">
+                      <UserAvatar user={h.user} size={26} fontSize={11} />
+
+                      <div>
+                        <p className="text-sm text-gray-700 leading-tight">
+                          <span className="font-medium">{h.user?.name || "System"}</span>{" "}
+                          {h.action.replace(/_/g, " ").toLowerCase()}
+
                           {h.field && (
                             <>
+                              {" "}
                               <span className="font-semibold">{h.field}</span>:{" "}
                               <span className="text-red-600">{h.old_value || "-"}</span> →{" "}
                               <span className="text-green-600">{h.new_value || "-"}</span>
                             </>
                           )}
-                        </>
-                      }
-                    </p>
-                    <p className="text-xs text-gray-400">{new Date(h.timestamp).toLocaleString()}</p>
+                        </p>
+
+                        <p className="text-xs text-gray-400 leading-tight mt-1">
+                          {new Date(h.timestamp).toLocaleString()}
+                        </p>
+                      </div>
+                    </div>
+
                   </li>
                 ))}
               </ul>
+
             )}
           </div>
         )}
