@@ -33,6 +33,8 @@ class HistoryAction(str, enum.Enum):
     reassigned = "reassigned"
     comment_added = "comment_added"
     time_logged = "time_logged"
+    ADDED = "added"
+    REMOVED = "removed"
 
 # Role model
 class Role(Base):
@@ -104,6 +106,26 @@ class Project(Base):
     def member_ids(self) -> list[int]:
         """Return a list of member IDs for this project."""
         return [member.id for member in self.members]
+
+
+class ProjectHistory(Base):
+    __tablename__ = "project_history"
+
+    id = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+
+    action = Column(String(255), nullable=False)  # FIXED
+    field = Column(String(255), nullable=True)    # FIXED
+    old_value = Column(String(500), nullable=True)
+    new_value = Column(String(500), nullable=True)
+
+    changes = Column(JSON, nullable=True, comment="JSON object of all changes")
+    description = Column(Text, nullable=True, comment="Human readable description")
+    timestamp = Column(DateTime(timezone=True), server_default=func.now())
+
+    user = relationship("User")
+    project = relationship("Project")
 
 
 # Task model

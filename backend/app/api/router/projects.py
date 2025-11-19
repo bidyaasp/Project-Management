@@ -5,6 +5,7 @@ from app.db import models, schemas
 from app.db.database import get_db
 from app.deps import get_current_user
 from typing import List
+from app.utils.project_history_utils import log_project_history, detect_project_changes
 
 router = APIRouter()
 
@@ -52,6 +53,16 @@ def create_project(
     db.add(project)
     db.commit()
     db.refresh(project)
+
+    # Log project creation
+    log_project_history(
+        db=db,
+        project=project,
+        user=current_user,
+        action="created",
+        field=None,
+        new_value=f"Project '{project.title}' created"
+    )
 
     return project
 
@@ -198,38 +209,117 @@ def get_project(
 # ---------------------------
 # UPDATE PROJECT
 # ---------------------------
-@router.put('/{project_id}', response_model=schemas.ProjectOut)
+@router.put("/{project_id}", response_model=schemas.ProjectOut)
 def update_project(
     project_id: int,
     project_in: schemas.ProjectUpdate,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
-    if current_user.role.name not in ('admin', 'manager'):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Not permitted')
-
     project = db.query(models.Project).filter(models.Project.id == project_id).first()
     if not project:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Project not found')
+        raise HTTPException(status_code=404, detail="Project not found")
 
-    if project_in.title:
+    # Keep a snapshot of old values
+    old_data = {
+        "title": project.title,
+        "description": project.description,
+        "member_ids": [m.id for m in project.members]
+    }
+
+    # Track if any changes were made
+    is_changed = False
+
+    # --- TITLE UPDATE ---
+    if project_in.title is not None and project_in.title != project.title:
+        db.add(models.ProjectHistory(
+            project_id=project.id,
+            user_id=current_user.id,
+            action="field_update",
+            field="title",
+            old_value=project.title,
+            new_value=project_in.title,
+            changes={"from": project.title, "to": project_in.title}
+        ))
         project.title = project_in.title
-    if project_in.description:
-        project.description = project_in.description
+        is_changed = True
 
+    # --- DESCRIPTION UPDATE ---
+    if project_in.description is not None and project_in.description != project.description:
+        db.add(models.ProjectHistory(
+            project_id=project.id,
+            user_id=current_user.id,
+            action="field_update",
+            field="description",
+            old_value=project.description,
+            new_value=project_in.description,
+            changes={"from": project.description, "to": project_in.description}
+        ))
+        project.description = project_in.description
+        is_changed = True
+
+    # --- MEMBERS UPDATE ---
     if project_in.member_ids is not None:
+        # Validate
         members = db.query(models.User).filter(models.User.id.in_(project_in.member_ids)).all()
         if len(members) != len(set(project_in.member_ids)):
             existing_ids = [m.id for m in members]
             invalid_ids = list(set(project_in.member_ids) - set(existing_ids))
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
+                status_code=400,
                 detail=f"Invalid member IDs: {invalid_ids}"
             )
+
+        old_member_ids = set(old_data["member_ids"])
+        new_member_ids = set(project_in.member_ids)
+
+        # Detect changes
+        removed_member_ids = list(old_member_ids - new_member_ids)
+        added_member_ids = list(new_member_ids - old_member_ids)
+
+        # Log removed members (ONE entry)
+        if removed_member_ids:
+            removed_users = db.query(models.User).filter(
+                models.User.id.in_(removed_member_ids)
+            ).all()
+
+            db.add(models.ProjectHistory(
+                project_id=project.id,
+                user_id=current_user.id,
+                action="members_removed",
+                field="members",
+                old_value=[u.id for u in removed_users],
+                new_value=None,
+                changes={"removed": [u.id for u in removed_users]},
+            ))
+            is_changed = True
+
+        # Log added members (ONE entry)
+        if added_member_ids:
+            added_users = db.query(models.User).filter(
+                models.User.id.in_(added_member_ids)
+            ).all()
+
+            db.add(models.ProjectHistory(
+                project_id=project.id,
+                user_id=current_user.id,
+                action="members_added",
+                field="members",
+                old_value=None,
+                new_value=[u.id for u in added_users],
+                changes={"added": [u.id for u in added_users]},
+            ))
+            is_changed = True
+
+        # Finally update the members field
         project.members = members
+
+    if not is_changed:
+        return project  # Nothing changed → no need to commit
 
     db.commit()
     db.refresh(project)
+
     return project
 
 
@@ -262,8 +352,23 @@ def toggle_archive_project(project_id:int, archive:bool, db:Session=Depends(get_
         raise HTTPException(403, 'Not permitted')
     project = db.query(models.Project).filter_by(id=project_id).first()
     if not project: raise HTTPException(404, 'Project not found')
+
+    old_value = project.is_archived
     project.is_archived = archive
-    db.commit(); db.refresh(project)
+
+    db.commit()
+    db.refresh(project)
+
+    log_project_history(
+        db=db,
+        project=project,
+        user=current_user,
+        action="archive_toggled",
+        field="is_archived",
+        old_value=old_value,
+        new_value=archive,
+    )
+
     return project
 
 
@@ -295,9 +400,28 @@ def add_members(
     if not members:
         raise HTTPException(status_code=400, detail="No valid members found")
 
-    for m in members:
-        if m not in project.members:
-            project.members.append(m)
+    # Determine new members to add
+    existing_ids = {m.id for m in project.members}
+    new_members = [m for m in members if m.id not in existing_ids]
+
+    # Add them
+    for m in new_members:
+        project.members.append(m)
+
+        # ─────────────────────────────
+    #  Log Project History
+    # ─────────────────────────────
+    if new_members:
+        log_project_history(
+            db=db,
+            project=project,
+            user=current_user,
+            action=models.HistoryAction.ADDED,
+            field="members",
+            old_value=None,
+            new_value=", ".join([m.name for m in new_members]),  # <-- convert list to string
+            description=f"{current_user.name} added members: {', '.join([m.name for m in new_members])}"
+        )
 
     db.commit()
     db.refresh(project)
@@ -360,11 +484,48 @@ def remove_members(
     if not isinstance(member_ids, list):
         raise HTTPException(status_code=400, detail="member_ids must be a list")
 
+    # Fetch users to remove
     members_to_remove = db.query(models.User).filter(models.User.id.in_(member_ids)).all()
+
+    removed_members = []
+
     for m in members_to_remove:
         if m in project.members:
             project.members.remove(m)
+            removed_members.append(m)
 
     db.commit()
     db.refresh(project)
-    return {"ok": True, "message": "Members removed", "members": [m.id for m in project.members]}
+
+    # ------------------------------
+    # LOGGING WITH MEMBER NAMES
+    # ------------------------------
+    if removed_members:
+        removed_names = [m.name for m in removed_members]
+
+        log_project_history(
+            db=db,
+            project=project,
+            user=current_user,
+            action=models.HistoryAction.REMOVED,
+            field="members",
+            old_value=None,
+            new_value=", ".join(removed_names),  # <-- serialize list to comma-separated string
+        )
+
+    return {
+        "ok": True,
+        "message": "Members removed",
+        "members": [m.id for m in project.members]
+    }
+
+
+@router.get("/{project_id}/history", response_model=List[schemas.ProjectHistoryOut])
+def get_project_history(project_id: int, db: Session = Depends(get_db)):
+    logs = (
+        db.query(models.ProjectHistory)
+        .filter(models.ProjectHistory.project_id == project_id)
+        .order_by(models.ProjectHistory.timestamp.desc())
+        .all()
+    )
+    return logs

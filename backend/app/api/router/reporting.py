@@ -124,28 +124,85 @@ def summary_dashboard(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
-    require_manager_or_admin(current_user)
+    # --------------------------------------------------
+    # 1️⃣ ADMIN — can see everything
+    # --------------------------------------------------
+    if current_user.role.name == "admin":
+        total_projects = db.query(func.count(models.Project.id)).scalar() or 0
+        total_tasks = db.query(func.count(models.Task.id)).scalar() or 0
+        total_users = db.query(func.count(models.User.id)).scalar() or 0
 
-    total_projects = db.query(func.count(models.Project.id)).scalar() or 0
-    total_tasks = db.query(func.count(models.Task.id)).scalar() or 0
-    total_users = db.query(func.count(models.User.id)).scalar() or 0
+        overdue_tasks = db.query(func.count(models.Task.id)).filter(
+            models.Task.due_date < datetime.utcnow(),
+            models.Task.status != "done"
+        ).scalar() or 0
 
-    overdue_tasks = db.query(func.count(models.Task.id)).filter(
-        models.Task.due_date < datetime.utcnow(),
-        models.Task.status != "done"
-    ).scalar() or 0
+        completed_tasks = db.query(func.count(models.Task.id)).filter(
+            models.Task.status == "done"
+        ).scalar() or 0
 
-    completed_tasks = db.query(func.count(models.Task.id)).filter(
-        models.Task.status == "done"
-    ).scalar() or 0
+    # --------------------------------------------------
+    # 2️⃣ MANAGER / DEVELOPER — only their projects
+    # --------------------------------------------------
+    else:
+        # Get all project IDs where this user is a member
+        project_ids = (
+            db.query(models.project_members.c.project_id)
+            .filter(models.project_members.c.user_id == current_user.id)
+            .subquery()
+        )
 
-    progress_percent = (completed_tasks / total_tasks * 100) if total_tasks > 0 else 0.0
+        # Count projects they are part of
+        total_projects = (
+            db.query(func.count(models.Project.id))
+            .filter(models.Project.id.in_(project_ids))
+            .scalar() or 0
+        )
+
+        # Count tasks only from those projects
+        total_tasks = (
+            db.query(func.count(models.Task.id))
+            .filter(models.Task.project_id.in_(project_ids))
+            .scalar() or 0
+        )
+
+        # ✅ Count users only inside the user's projects
+        total_users = (
+            db.query(func.count(func.distinct(models.project_members.c.user_id)))
+            .filter(models.project_members.c.project_id.in_(project_ids))
+            .scalar() or 0
+        )
+
+        overdue_tasks = (
+            db.query(func.count(models.Task.id))
+            .filter(
+                models.Task.project_id.in_(project_ids),
+                models.Task.due_date < datetime.utcnow(),
+                models.Task.status != "done"
+            )
+            .scalar() or 0
+        )
+
+        completed_tasks = (
+            db.query(func.count(models.Task.id))
+            .filter(
+                models.Task.project_id.in_(project_ids),
+                models.Task.status == "done"
+            )
+            .scalar() or 0
+        )
+
+    # Final stats
+    progress_percent = (
+        (completed_tasks / total_tasks * 100)
+        if total_tasks > 0 else 0.0
+    )
 
     return {
         "totals": {
             "projects": total_projects,
             "tasks": total_tasks,
-            "users": total_users
+            "users": total_users   # None for non-admin
         },
         "completed_tasks": completed_tasks,
         "overdue_tasks": overdue_tasks,

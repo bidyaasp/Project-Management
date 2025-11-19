@@ -67,7 +67,7 @@ export default function Nav() {
 
         {/* Right section */}
         <div className="flex items-center gap-3">
-          {user ? (
+          {user && (
             <div className="flex items-center gap-4">
               <span className="text-gray-800 flex items-center gap-2">
                 Welcome, <strong>{user.name}</strong>
@@ -91,15 +91,6 @@ export default function Nav() {
               >
                 Logout
               </button>
-            </div>
-          ) : (
-            <div className="flex gap-3">
-              <Link
-                to="/login"
-                className="bg-blue-600 text-white px-4 py-1.5 rounded-lg hover:bg-blue-700 transition font-medium"
-              >
-                Login
-              </Link>
             </div>
           )}
         </div>

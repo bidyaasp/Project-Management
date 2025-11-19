@@ -16,19 +16,27 @@ export default function ProjectDetail() {
     description: "",
     due_date: "",
     assignee_id: "",
-    priority: "",
-    estimated_hours: "",
+    priority: "low",
+    estimated_hours: null,    // null instead of ""
   });
   const [selectedMemberIds, setSelectedMemberIds] = useState([]);
   const [editForm, setEditForm] = useState({
     title: "",
     description: "",
-    member_ids: [],
   });
   const [editingTask, setEditingTask] = useState(null); // ✅ Edit task state
   const { user } = useAuth();
   const navigate = useNavigate();
   const [progress, setProgress] = useState(0); // ✅ new state
+
+  const [projectHistory, setProjectHistory] = useState([]);
+  const [loadingProjectHistory, setLoadingProjectHistory] = useState(true);
+  const [openAccordion, setOpenAccordion] = useState("info");
+
+  const toggleAccordion = (key) => {
+    setOpenAccordion(prev => prev === key ? "" : key);
+  };
+
 
   const canManage =
     user && ["admin", "manager"].includes(user.role?.name?.toLowerCase());
@@ -172,6 +180,22 @@ export default function ProjectDetail() {
     }
   };
 
+  useEffect(() => {
+    const fetchHistory = async () => {
+      try {
+        const res = await api.get(`/projects/${project.id}/history`);
+        setProjectHistory(res.data);
+      } catch (err) {
+        console.error("Error fetching project history", err);
+      } finally {
+        setLoadingProjectHistory(false);
+      }
+    };
+
+    if (project) fetchHistory();
+  }, [project]);
+
+
   if (!project) return <div className="p-6">Loading project details...</div>;
 
   return (
@@ -313,10 +337,10 @@ export default function ProjectDetail() {
                     <td className="px-4 py-2 text-sm text-gray-700">{t.assignee?.name || "-"}</td>
                     <td
                       className={`px-4 py-2 text-sm font-medium ${t.status === "done"
-                          ? "text-green-600"
-                          : isOverdue(t.due_date, t.status)
-                            ? "text-red-600"
-                            : "text-gray-700"
+                        ? "text-green-600"
+                        : isOverdue(t.due_date, t.status)
+                          ? "text-red-600"
+                          : "text-gray-700"
                         }`}
                     >
                       {t.due_date ? formatDate(t.due_date) : "-"}
@@ -329,10 +353,10 @@ export default function ProjectDetail() {
                     <td className="px-4 py-2 text-sm">
                       <span
                         className={`px-2 py-1 text-xs font-medium rounded-full ${t.status === "done"
-                            ? "bg-green-100 text-green-800"
-                            : t.status === "in_progress"
-                              ? "bg-yellow-100 text-yellow-800"
-                              : "bg-gray-100 text-gray-800"
+                          ? "bg-green-100 text-green-800"
+                          : t.status === "in_progress"
+                            ? "bg-yellow-100 text-yellow-800"
+                            : "bg-gray-100 text-gray-800"
                           }`}
                       >
                         {t.status.replace("_", " ").toUpperCase()}
@@ -371,6 +395,54 @@ export default function ProjectDetail() {
         )}
       </div>
 
+      {/* ────────────── Project History ────────────── */}
+      <div className="bg-white p-4 rounded-lg shadow mt-6">
+      <div
+        className="flex justify-between items-center mb-3 cursor-pointer"
+        onClick={() => toggleAccordion("history")}
+      >
+        <h2 className="text-xl font-semibold">Project History</h2>
+        <span className="text-blue-600 text-sm hover:underline">
+          {openAccordion === "history" ? "▲" : "▼"}
+        </span>
+      </div>
+
+        {openAccordion === "history" && (
+          <div className="max-h-72 overflow-y-auto">
+            {loadingProjectHistory ? (
+              <p className="text-gray-500">Loading history...</p>
+            ) : projectHistory.length === 0 ? (
+              <p className="text-gray-500">No history records yet.</p>
+            ) : (
+              <ul className="divide-y divide-gray-200">
+                {projectHistory.map((h) => (
+                  <li key={h.id} className="py-2">
+                    <p className="text-sm text-gray-700">
+                      <span className="font-medium">{h.user?.name || "System"}</span>{" "}
+                      {
+                        <>
+                        
+                          {h.action.replace("_", " ").toLowerCase()}{" "} 
+                          {h.field && (
+                            <>
+                              <span className="font-semibold">{h.field}</span>:{" "}
+                              <span className="text-red-600">{h.old_value || "-"}</span> →{" "}
+                              <span className="text-green-600">{h.new_value || "-"}</span>
+                            </>
+                          )}
+                        </>
+                      }
+                    </p>
+                    <p className="text-xs text-gray-400">{new Date(h.timestamp).toLocaleString()}</p>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+      </div>
+
+
       {/* Modals */}
       {showTaskForm && (
         <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center">
@@ -390,15 +462,15 @@ export default function ProjectDetail() {
               className="border rounded w-full p-2 mb-3"
             />
             <div>
-                <label className="block text-sm font-medium mb-1">
-                  Due date
-                </label>
-                <input
-                  type="datetime-local"
-                  value={newTask.due_date}
-                  onChange={(e) => setNewTask({ ...newTask, due_date: e.target.value })}
-                  className="border rounded w-full p-2 mb-3"
-                />
+              <label className="block text-sm font-medium mb-1">
+                Due date
+              </label>
+              <input
+                type="datetime-local"
+                value={newTask.due_date}
+                onChange={(e) => setNewTask({ ...newTask, due_date: e.target.value })}
+                className="border rounded w-full p-2 mb-3"
+              />
             </div>
             <select
               value={newTask.assignee_id}
@@ -425,18 +497,18 @@ export default function ProjectDetail() {
               <option value="high">High</option>
             </select>
             <input
-                  type="number"
-                  min="1"
-                  step="0.5"
-                  value={newTask.estimated_hours}
-                  placeholder="Estimated Hours"
-                  onChange={(e) =>
-                    setNewTask({
-                      ...newTask,
-                      estimated_hours: e.target.value,
-                    })
-                  }
-                  className="border rounded w-full p-2 mb-3"
+              type="number"
+              min="1"
+              step="0.5"
+              value={newTask.estimated_hours}
+              placeholder="Estimated Hours"
+              onChange={(e) =>
+                setNewTask({
+                  ...newTask,
+                  estimated_hours: e.target.value,
+                })
+              }
+              className="border rounded w-full p-2 mb-3"
             />
             <div className="flex justify-end space-x-2">
               <button onClick={() => setShowTaskForm(false)} className="bg-gray-200 px-4 py-2 rounded">
@@ -498,25 +570,25 @@ export default function ProjectDetail() {
             <div>
               <label className="block text-sm font-medium mb-1">
                 Title
-              </label>        
+              </label>
               <input
                 type="text"
                 value={editingTask.title}
                 onChange={(e) => setEditingTask({ ...editingTask, title: e.target.value })}
                 placeholder="Title"
                 className="border rounded w-full p-2 mb-3"
-              />                    
+              />
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">
                 Description
-              </label>                 
-            <textarea
-              value={editingTask.description}
-              onChange={(e) => setEditingTask({ ...editingTask, description: e.target.value })}
-              placeholder="Description"
-              className="border rounded w-full p-2 mb-3"
-            />              
+              </label>
+              <textarea
+                value={editingTask.description}
+                onChange={(e) => setEditingTask({ ...editingTask, description: e.target.value })}
+                placeholder="Description"
+                className="border rounded w-full p-2 mb-3"
+              />
             </div>
 
             <div>
@@ -528,7 +600,7 @@ export default function ProjectDetail() {
                 value={editingTask.due_date || ""}
                 onChange={(e) => setEditingTask({ ...editingTask, due_date: e.target.value })}
                 className="border rounded w-full p-2 mb-3"
-              />                       
+              />
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">
@@ -545,43 +617,43 @@ export default function ProjectDetail() {
                     {m.name} ({m.role?.name})
                   </option>
                 ))}
-              </select>                            
+              </select>
             </div>
-             <div>
-                <label className="block text-sm font-medium mb-1">
-                  Priority
-                </label>
-                <select
-                  value={editingTask.priority || ""}
-                  onChange={(e) =>
-                    setEditingTask({ ...editingTask, priority: e.target.value })
-                  }
-                  className="border rounded w-full p-2 mb-3"
-                >
-                  <option value="">Select Priority</option>
-                  <option value="low">Low</option>
-                  <option value="medium">Medium</option>
-                  <option value="high">High</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  Estimated Hours
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  step="0.5"
-                  value={editingTask.estimated_hours || ""}
-                  onChange={(e) =>
-                    setEditingTask({
-                      ...editingTask,
-                      estimated_hours: e.target.value,
-                    })
-                  }
-                  className="border rounded w-full p-2 mb-3"
-                />
-              </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                Priority
+              </label>
+              <select
+                value={editingTask.priority || ""}
+                onChange={(e) =>
+                  setEditingTask({ ...editingTask, priority: e.target.value })
+                }
+                className="border rounded w-full p-2 mb-3"
+              >
+                <option value="">Select Priority</option>
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                Estimated Hours
+              </label>
+              <input
+                type="number"
+                min="1"
+                step="0.5"
+                value={editingTask.estimated_hours || ""}
+                onChange={(e) =>
+                  setEditingTask({
+                    ...editingTask,
+                    estimated_hours: e.target.value,
+                  })
+                }
+                className="border rounded w-full p-2 mb-3"
+              />
+            </div>
             <div className="flex justify-end space-x-2">
               <button onClick={() => setEditingTask(null)} className="bg-gray-200 px-4 py-2 rounded">Cancel</button>
               <button onClick={handleEditTask} className="bg-blue-600 text-white px-4 py-2 rounded">Save</button>
@@ -608,31 +680,6 @@ export default function ProjectDetail() {
               placeholder="Description"
               className="border rounded w-full p-2 mb-3"
             />
-            <div className="mb-4">
-              <h4 className="text-sm font-semibold mb-2">Assign Members:</h4>
-              <div className="border rounded w-full p-2 max-h-48 overflow-y-auto">
-                {users.map((u) => (
-                  <label key={u.id} className="flex items-center space-x-2 mb-1">
-                    <input
-                      type="checkbox"
-                      value={u.id}
-                      checked={editForm.member_ids.includes(u.id)}
-                      onChange={(e) => {
-                        const checked = e.target.checked;
-                        const value = Number(e.target.value);
-                        setEditForm((prev) => ({
-                          ...prev,
-                          member_ids: checked
-                            ? [...prev.member_ids, value]
-                            : prev.member_ids.filter((id) => id !== value),
-                        }));
-                      }}
-                    />
-                    <span>{u.name} ({u.role?.name})</span>
-                  </label>
-                ))}
-              </div>
-            </div>
             <div className="flex justify-end space-x-2">
               <button onClick={() => setShowEditModal(false)} className="bg-gray-200 px-4 py-2 rounded">Cancel</button>
               <button onClick={handleEditProject} className="bg-blue-600 text-white px-4 py-2 rounded">Save</button>

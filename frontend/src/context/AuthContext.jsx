@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState } from 'react'
+import React, { createContext, useContext, useState, useEffect } from 'react'
 import api from '../services/api'
 
 const AuthContext = createContext(null)
@@ -10,6 +10,15 @@ export function AuthProvider({ children }) {
     } catch { return null }
   })
   const [token, setToken] = useState(() => localStorage.getItem('pm_token'))
+
+  // ⬇️ Listen for token-expired event (401)
+  useEffect(() => {
+    const autoLogout = () => logout()
+
+    window.addEventListener('pm_force_logout', autoLogout)
+
+    return () => window.removeEventListener('pm_force_logout', autoLogout)
+  }, [])
 
   const login = async (email, password) => {
     const resp = await api.post('/auth/token', { email: email, password })

@@ -6,6 +6,7 @@ from app.deps import get_current_user
 from datetime import datetime
 from typing import Optional
 from app.utils.task_history_utils import log_task_history
+from app.utils.project_history_utils import log_project_history
 
 router = APIRouter()
 
@@ -66,6 +67,19 @@ def create_task(
         action=models.HistoryAction.created,
         description=f"Task '{task.title}' created by {current_user.name}"
     )
+
+    # Log project history
+    if project:
+        log_project_history(
+            db=db,
+            project=project,
+            user=current_user,
+            action=models.HistoryAction.ADDED,  # define in your HistoryAction enum
+            field="tasks",
+            old_value=None,
+            new_value=task.title,
+            description=f"{current_user.name} added task '{task.title}'"
+        )
 
     return task
 
@@ -266,8 +280,24 @@ def delete_task(
     if current_user.role.name not in ("admin", "manager"):
         raise HTTPException(status_code=403, detail="Not permitted")
 
+    project = task.project  # get the associated project before deletion
+
     db.delete(task)
     db.commit()
+
+    # Log project history
+    if project:
+        log_project_history(
+            db=db,
+            project=project,
+            user=current_user,
+            action=models.HistoryAction.REMOVED,  # define in your HistoryAction enum
+            field="tasks",
+            old_value=task.title,
+            new_value=None,
+            description=f"{current_user.name} deleted task '{task.title}'"
+        )
+
     return {"ok": True, "message": "Task deleted successfully"}
 
 

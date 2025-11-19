@@ -20,4 +20,17 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 )
 
+// 🚨 Auto logout on 401 (expired token)
+api.interceptors.response.use(
+  (response) => response,
+
+  (error) => {
+    if (error.response && error.response.status === 401) {
+      // Fire event so AuthContext can logout
+      window.dispatchEvent(new Event('pm_force_logout'))
+    }
+    return Promise.reject(error)
+  }
+)
+
 export default api

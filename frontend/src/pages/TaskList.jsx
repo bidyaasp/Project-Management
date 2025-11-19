@@ -18,8 +18,8 @@ export default function TaskList() {
     due_date: "",
     assignee_id: "",
     project_id: "",
-    priority: "",
-    estimated_hours: "",
+    priority: "low",
+    estimated_hours: null,
   });
   const [projectMembers, setProjectMembers] = useState([]);
 
@@ -54,20 +54,36 @@ export default function TaskList() {
   }, [canManage]);
 
   // Sort tasks
-  const sortedTasks = useMemo(() => {
-    const statusOrder = { todo: 1, in_progress: 2, done: 3 };
+const sortedTasks = useMemo(() => {
+  const sorted = [...tasks];
 
-    return [...tasks].sort((a, b) => {
-      const statusA = statusOrder[a.status] || 99;
-      const statusB = statusOrder[b.status] || 99;
+  sorted.sort((a, b) => {
+    let aVal = a[sortBy];
+    let bVal = b[sortBy];
 
-      if (statusA !== statusB) return statusA - statusB;
+    // special handling for certain fields
+    if (sortBy === "assignee") {
+      aVal = a.assignee?.name || "";
+      bVal = b.assignee?.name || "";
+    } else if (sortBy === "status") {
+      const statusOrder = { todo: 1, in_progress: 2, done: 3 };
+      aVal = statusOrder[a.status] || 99;
+      bVal = statusOrder[b.status] || 99;
+    } else if (sortBy === "due_date") {
+      aVal = a.due_date ? new Date(a.due_date) : new Date(0);
+      bVal = b.due_date ? new Date(b.due_date) : new Date(0);
+    } else if (sortBy === "project") {
+      aVal = a.project?.title || "";
+      bVal = b.project?.title || "";
+    }
 
-      const dateA = a.due_date ? new Date(a.due_date) : new Date(0);
-      const dateB = b.due_date ? new Date(b.due_date) : new Date(0);
-      return dateA - dateB;
-    });
-  }, [tasks]);
+    if (aVal < bVal) return sortOrder === "asc" ? -1 : 1;
+    if (aVal > bVal) return sortOrder === "asc" ? 1 : -1;
+    return 0;
+  });
+
+  return sorted;
+}, [tasks, sortBy, sortOrder]);
 
   // Pagination
   const totalPages = Math.ceil(sortedTasks.length / pageSize);
@@ -175,8 +191,11 @@ export default function TaskList() {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                       Title
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Project
+                    <th
+                      onClick={() => handleSort("project")}
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer"
+                    >
+                      Project {sortBy === "project" && (sortOrder === "asc" ? "▲" : "▼")}
                     </th>
                     <th
                       onClick={() => handleSort("assignee")}
@@ -237,10 +256,10 @@ export default function TaskList() {
                         <td className="px-6 py-4 text-sm">
                           <span
                             className={`px-2 py-1 text-xs font-semibold rounded-full ${t.status === "done"
-                                ? "bg-green-100 text-green-800"
-                                : t.status === "in_progress"
-                                  ? "bg-yellow-100 text-yellow-800"
-                                  : "bg-red-100 text-red-800"
+                              ? "bg-green-100 text-green-800"
+                              : t.status === "in_progress"
+                                ? "bg-yellow-100 text-yellow-800"
+                                : "bg-red-100 text-red-800"
                               }`}
                           >
                             {t.status}
@@ -267,6 +286,7 @@ export default function TaskList() {
                                 setEditingTask({
                                   ...t,
                                   assignee_id: t.assignee?.id || "",
+                                  priority: t.priority || "low", // default to "low" if null
                                 })
                               }
                               className="text-blue-600 hover:underline mr-3"
@@ -550,7 +570,6 @@ export default function TaskList() {
                   }
                   className="border rounded w-full p-2 mb-3"
                 >
-                  <option value="">Select Priority</option>
                   <option value="low">Low</option>
                   <option value="medium">Medium</option>
                   <option value="high">High</option>
@@ -568,7 +587,7 @@ export default function TaskList() {
                   onChange={(e) =>
                     setEditingTask({
                       ...editingTask,
-                      estimated_hours: e.target.value,
+                      estimated_hours: e.target.value ? parseFloat(e.target.value) : null,
                     })
                   }
                   className="border rounded w-full p-2 mb-3"

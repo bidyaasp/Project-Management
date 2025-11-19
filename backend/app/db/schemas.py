@@ -133,6 +133,21 @@ class ProjectProgress(BaseModel):
     class Config:
         from_attributes = True  # <-- This enables from_orm in Pydantic v2
 
+class ProjectHistoryOut(BaseModel):
+    id: int
+    project_id: int
+    user: Optional[UserMini] = None
+    action: str
+    field: Optional[str] = None
+    old_value: Optional[str] = None
+    new_value: Optional[str] = None
+    changes: Optional[dict] = None
+    description: Optional[str] = None
+    timestamp: datetime
+
+    class Config:
+        from_attributes = True
+
 # ------------------ Task Schemas ------------------
 class TaskBase(BaseModel):
     title: str
