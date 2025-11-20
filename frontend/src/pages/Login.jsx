@@ -22,8 +22,8 @@ export default function Login() {
   }
 
   return (
-    <div className="flex justify-center items-start bg-gray-50 min-h-screen py-10">
-      <div className="w-full max-w-md bg-white px-8 py-6 rounded-2xl shadow-lg border border-gray-200 self-start mt-10">
+    <div className="flex justify-center items-center bg-gray-50 py-20">
+      <div className="w-full max-w-md bg-white px-8 py-6 rounded-2xl shadow-lg border border-gray-200">
         <h2 className="text-2xl font-bold text-center text-blue-700 mb-6">Login</h2>
 
         {error && (
@@ -31,7 +31,7 @@ export default function Login() {
             {error}
           </div>
         )}
-
+ 
         <form onSubmit={handleSubmit} className="space-y-4">
           <input
             className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-400 outline-none"

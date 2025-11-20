@@ -34,6 +34,9 @@ export default function ProjectDetail() {
   const [loadingProjectHistory, setLoadingProjectHistory] = useState(true);
   const [openAccordion, setOpenAccordion] = useState("info");
 
+  const pageSize = 5;
+  const [currentPage, setCurrentPage] = useState(1);
+
   const toggleAccordion = (key) => {
     setOpenAccordion(prev => prev === key ? "" : key);
   };
@@ -90,6 +93,7 @@ export default function ProjectDetail() {
       setShowTaskForm(false);
       setNewTask({ title: "", description: "", due_date: "", assignee_id: "" });
       loadProject();
+      setCurrentPage(Math.ceil((project.tasks.length + 1) / pageSize)); // go to last page
     } catch (err) {
       alert("Error adding task");
       console.error(err);
@@ -112,6 +116,7 @@ export default function ProjectDetail() {
     try {
       await api.delete(`/tasks/${taskId}`);
       loadProject();
+      setCurrentPage(1);
     } catch (err) {
       alert("Failed to delete task");
       console.error(err);
@@ -276,37 +281,39 @@ export default function ProjectDetail() {
         </div>
 
         {project.members?.length > 0 ? (
-          <ul className="divide-y divide-gray-200">
-            {project.members.map((m) => (
-              <li
-                key={m.id}
-                className="py-2 flex justify-between items-center"
-              >
-                <div className="flex items-center gap-3">
-                  {/* Avatar */}
-                  <UserAvatar user={m} size={32} fontSize={14} />
+          <div className="max-h-64 overflow-y-auto border rounded p-2"> {/* Scrollable container */}
+            <ul className="divide-y divide-gray-200">
+              {project.members.map((m) => (
+                <li
+                  key={m.id}
+                  className="py-2 flex justify-between items-center"
+                >
+                  <div className="flex items-center gap-3">
+                    {/* Avatar */}
+                    <UserAvatar user={m} size={32} fontSize={14} />
 
-                  {/* Name + Role + Email */}
-                  <div>
-                    <div className="font-medium text-gray-900 flex items-center gap-1">
-                      {m.name}
-                      <span className="text-sm text-gray-500">({m.role?.name})</span>
+                    {/* Name + Role + Email */}
+                    <div>
+                      <div className="font-medium text-gray-900 flex items-center gap-1">
+                        {m.name}
+                        <span className="text-sm text-gray-500">({m.role?.name})</span>
+                      </div>
+                      <div className="text-sm text-gray-600">{m.email}</div>
                     </div>
-                    <div className="text-sm text-gray-600">{m.email}</div>
                   </div>
-                </div>
 
-                {canManage && (
-                  <button
-                    onClick={() => handleDeleteMember(m.id)}
-                    className="text-red-600 text-sm hover:underline"
-                  >
-                    Remove
-                  </button>
-                )}
-              </li>
-            ))}
-          </ul>
+                  {canManage && (
+                    <button
+                      onClick={() => handleDeleteMember(m.id)}
+                      className="text-red-600 text-sm hover:underline"
+                    >
+                      Remove
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
         ) : (
           <p className="text-gray-500">No members assigned yet.</p>
         )}
@@ -327,85 +334,120 @@ export default function ProjectDetail() {
         </div>
 
         {project.tasks?.length > 0 ? (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Title</th>
-                  <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Assignee</th>
-                  <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Due Date</th>
-                  <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Status</th>
-                  {canManage && <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Actions</th>}
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {project.tasks.map((t) => (
-                  <tr
-                    key={t.id}
-                    className="border-t hover:bg-gray-50 cursor-pointer transition-colors"
-                    onClick={() => navigate(`/tasks/${t.id}`, { state: { from: "project", projectId: project.id } })} // ✅ navigate to task details
-                  >
-                    <td className="px-4 py-2 text-sm text-gray-900">{t.title}</td>
-                    <td className="px-4 py-2 text-sm text-gray-700">{t.assignee?.name || "-"}</td>
-                    <td
-                      className={`px-4 py-2 text-sm font-medium ${t.status === "done"
-                        ? "text-green-600"
-                        : isOverdue(t.due_date, t.status)
-                          ? "text-red-600"
-                          : "text-gray-700"
-                        }`}
-                    >
-                      {t.due_date ? formatDate(t.due_date) : "-"}
-                      {t.status !== "done" && isOverdue(t.due_date, t.status) && (
-                        <span className="ml-2 inline-flex items-center text-xs font-semibold text-red-600 bg-red-100 px-2 py-0.5 rounded-full">
-                          ⚠️ Overdue
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-2 text-sm">
-                      <span
-                        className={`px-2 py-1 text-xs font-medium rounded-full ${t.status === "done"
-                          ? "bg-green-100 text-green-800"
-                          : t.status === "in_progress"
-                            ? "bg-yellow-100 text-yellow-800"
-                            : "bg-gray-100 text-gray-800"
-                          }`}
-                      >
-                        {t.status.replace("_", " ").toUpperCase()}
-                      </span>
-                    </td>
-                    {canManage && (
-                      <td className="px-4 py-2 text-sm flex gap-2">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation(); // Prevent row click from firing
-                            setEditingTask({ ...t, assignee_id: t.assignee?.id || "" });
-                          }}
-                          className="text-blue-600 hover:underline"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation(); // Prevent row click from firing
-                            handleDeleteTask(t.id);
-                          }}
-                          className="text-red-600 hover:underline"
-                        >
-                          Delete
-                        </button>
-                      </td>
-                    )}
-                  </tr>
-                ))}
-              </tbody>
+          <>
+            {/* Pagination Logic */}
+            {(() => {
+              const totalPages = Math.ceil(project.tasks.length / pageSize);
+              const paginatedTasks = project.tasks.slice(
+                (currentPage - 1) * pageSize,
+                currentPage * pageSize
+              );
+              return (
+                <>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Title</th>
+                          <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Assignee</th>
+                          <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Due Date</th>
+                          <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Status</th>
+                          {canManage && <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Actions</th>}
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {paginatedTasks.map((t) => (
+                          <tr
+                            key={t.id}
+                            className="border-t hover:bg-gray-50 cursor-pointer transition-colors"
+                            onClick={() => navigate(`/tasks/${t.id}`, { state: { from: "project", projectId: project.id } })}
+                          >
+                            <td className="px-4 py-2 text-sm text-gray-900">{t.title}</td>
+                            <td className="px-4 py-2 text-sm text-gray-700">{t.assignee?.name || "-"}</td>
+                            <td
+                              className={`px-4 py-2 text-sm font-medium ${t.status === "done"
+                                ? "text-green-600"
+                                : isOverdue(t.due_date, t.status)
+                                  ? "text-red-600"
+                                  : "text-gray-700"
+                                }`}
+                            >
+                              {t.due_date ? formatDate(t.due_date) : "-"}
+                              {t.status !== "done" && isOverdue(t.due_date, t.status) && (
+                                <span className="ml-2 inline-flex items-center text-xs font-semibold text-red-600 bg-red-100 px-2 py-0.5 rounded-full">
+                                  ⚠️ Overdue
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-4 py-2 text-sm">
+                              <span
+                                className={`px-2 py-1 text-xs font-medium rounded-full ${t.status === "done"
+                                  ? "bg-green-100 text-green-800"
+                                  : t.status === "in_progress"
+                                    ? "bg-yellow-100 text-yellow-800"
+                                    : "bg-gray-100 text-gray-800"
+                                  }`}
+                              >
+                                {t.status.replace("_", " ").toUpperCase()}
+                              </span>
+                            </td>
+                            {canManage && (
+                              <td className="px-4 py-2 text-sm flex gap-2">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setEditingTask({ ...t, assignee_id: t.assignee?.id || "" });
+                                  }}
+                                  className="text-blue-600 hover:underline"
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteTask(t.id);
+                                  }}
+                                  className="text-red-600 hover:underline"
+                                >
+                                  Delete
+                                </button>
+                              </td>
+                            )}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
 
-            </table>
-          </div>
+                  {/* Pagination Controls */}
+                  <div className="flex justify-between items-center mt-3">
+                    <button
+                      onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
+                      disabled={currentPage === 1}
+                      className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 disabled:opacity-50"
+                    >
+                      Previous
+                    </button>
+                    <span className="text-sm text-gray-700">
+                      Page {currentPage} of {totalPages}
+                    </span>
+                    <button
+                      onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
+                      disabled={currentPage === totalPages}
+                      className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 disabled:opacity-50"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </>
+              );
+            })()}
+          </>
         ) : (
           <p className="text-gray-500">No tasks added yet.</p>
         )}
       </div>
+
 
       {/* ────────────── Project History ────────────── */}
       <div className="bg-white p-4 rounded-lg shadow mt-6">

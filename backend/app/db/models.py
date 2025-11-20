@@ -28,11 +28,11 @@ class TaskPriority(str, enum.Enum):
 class HistoryAction(str, enum.Enum):
     created = "created"
     updated = "updated"
-    status_changed = "status_changed"
+    status_changed = "status changed"
     assigned = "assigned"
     reassigned = "reassigned"
-    comment_added = "comment_added"
-    time_logged = "time_logged"
+    comment_added = "comment added"
+    time_logged = "time logged"
     ADDED = "added"
     REMOVED = "removed"
 

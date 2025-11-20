@@ -12,6 +12,10 @@ export default function Users() {
   const nav = useNavigate();
   const [roles, setRoles] = useState([]);
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 8;
+
   const isAdmin = user?.role?.name?.toLowerCase() === "admin";
   const isManager = user?.role?.name?.toLowerCase() === "manager";
 
@@ -19,6 +23,16 @@ export default function Users() {
     api.get("/users/").then((r) => setUsers(r.data)).catch(console.error);
     api.get("/roles/").then((r) => setRoles(r.data)).catch(console.error);  // fetch roles here
   }, []);
+
+  // Pagination helpers
+  const totalPages = Math.ceil(users.length / pageSize);
+  const paginatedUsers = users.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
+  );
+
+  const handlePrevPage = () => setCurrentPage((p) => Math.max(p - 1, 1));
+  const handleNextPage = () => setCurrentPage((p) => Math.min(p + 1, totalPages));
 
   return (
     <div className="max-w-5xl mx-auto mt-10 bg-white p-6 rounded-2xl shadow">
@@ -38,72 +52,93 @@ export default function Users() {
       {users.length === 0 ? (
         <p className="text-gray-500 text-center">No users found.</p>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200 border rounded-lg text-sm">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-4 py-2 text-left font-semibold text-gray-600 uppercase text-xs">
-                  User
-                </th>
-                <th className="px-4 py-2 text-left font-semibold text-gray-600 uppercase text-xs">
-                  Role
-                </th>
-                <th className="px-4 py-2 text-left font-semibold text-gray-600 uppercase text-xs">
-                  Status
-                </th>
-              </tr>
-            </thead>
-
-            <tbody className="bg-white divide-y divide-gray-100">
-              {users.map((u, idx) => (
-                <tr
-                  key={u.id}
-                  className={`hover:bg-gray-50 transition ${idx % 2 === 0 ? "bg-gray-50/20" : ""}`}
-                >
-                  {/* User */}
-                  <td
-                    className="px-4 py-2 cursor-pointer"
-                    onClick={() => nav(`/users/${u.id}`)}
-                  >
-                    <div className="flex items-center gap-2">
-                      <UserAvatar user={u} size={28} fontSize={11} />
-
-                      <div>
-                        <p className="font-medium text-gray-900 leading-tight hover:text-blue-600">
-                          {u.name}
-                        </p>
-                        <p className="text-xs text-gray-500 leading-tight">
-                          {u.email}
-                        </p>
-                      </div>
-                    </div>
-                  </td>
-
-                  {/* Role */}
-                  <td
-                    className="px-4 py-2 text-gray-700 cursor-pointer leading-tight"
-                    onClick={() => nav(`/users/${u.id}`)}
-                  >
-                    {u.role?.name || "-"}
-                  </td>
-
-                  {/* Status */}
-                  <td
-                    className="px-4 py-2 cursor-pointer leading-tight"
-                    onClick={() => nav(`/users/${u.id}`)}
-                  >
-                    {u.is_active ? (
-                      <span className="text-green-600 font-medium">Active</span>
-                    ) : (
-                      <span className="text-red-600 font-medium">Inactive</span>
-                    )}
-                  </td>
+        <>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200 border rounded-lg text-sm">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-2 text-left font-semibold text-gray-600 uppercase text-xs">
+                    User
+                  </th>
+                  <th className="px-4 py-2 text-left font-semibold text-gray-600 uppercase text-xs">
+                    Role
+                  </th>
+                  <th className="px-4 py-2 text-left font-semibold text-gray-600 uppercase text-xs">
+                    Status
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
 
+              <tbody className="bg-white divide-y divide-gray-100">
+                {paginatedUsers.map((u, idx) => (
+                  <tr
+                    key={u.id}
+                    className={`hover:bg-gray-50 transition ${idx % 2 === 0 ? "bg-gray-50/20" : ""}`}
+                  >
+                    {/* User */}
+                    <td
+                      className="px-4 py-2 cursor-pointer"
+                      onClick={() => nav(`/users/${u.id}`)}
+                    >
+                      <div className="flex items-center gap-2">
+                        <UserAvatar user={u} size={28} fontSize={11} />
+                        <div>
+                          <p className="font-medium text-gray-900 leading-tight hover:text-blue-600">
+                            {u.name}
+                          </p>
+                          <p className="text-xs text-gray-500 leading-tight">
+                            {u.email}
+                          </p>
+                        </div>
+                      </div>
+                    </td>
+
+                    {/* Role */}
+                    <td
+                      className="px-4 py-2 text-gray-700 cursor-pointer leading-tight"
+                      onClick={() => nav(`/users/${u.id}`)}
+                    >
+                      {u.role?.name || "-"}
+                    </td>
+
+                    {/* Status */}
+                    <td
+                      className="px-4 py-2 cursor-pointer leading-tight"
+                      onClick={() => nav(`/users/${u.id}`)}
+                    >
+                      {u.is_active ? (
+                        <span className="text-green-600 font-medium">Active</span>
+                      ) : (
+                        <span className="text-red-600 font-medium">Inactive</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination Controls */}
+          <div className="flex justify-center items-center gap-4 mt-4">
+            <button
+              onClick={handlePrevPage}
+              disabled={currentPage === 1}
+              className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 disabled:opacity-50"
+            >
+              Previous
+            </button>
+            <span>
+              Page {currentPage} of {totalPages}
+            </span>
+            <button
+              onClick={handleNextPage}
+              disabled={currentPage === totalPages}
+              className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 disabled:opacity-50"
+            >
+              Next
+            </button>
+          </div>
+        </>
       )}
 
       {/* ✅ Modal */}
