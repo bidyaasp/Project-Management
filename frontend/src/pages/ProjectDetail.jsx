@@ -420,7 +420,7 @@ export default function ProjectDetail() {
                   </div>
 
                   {/* Pagination Controls */}
-                  <div className="flex justify-between items-center mt-3">
+                  <div className="flex justify-center items-center gap-4 mt-4">
                     <button
                       onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
                       disabled={currentPage === 1}
@@ -511,7 +511,16 @@ export default function ProjectDetail() {
       {showTaskForm && (
         <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center">
           <div className="bg-white rounded-lg p-6 w-96 shadow-lg">
-            <h3 className="text-xl font-semibold mb-4">Add Task</h3>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-semibold">Add Task</h3>
+              <button
+                onClick={() => setShowTaskForm(false)}
+                className="text-gray-500 hover:text-gray-700 text-xl font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
             <input
               type="text"
               value={newTask.title}
@@ -564,7 +573,7 @@ export default function ProjectDetail() {
               type="number"
               min="1"
               step="0.5"
-              value={newTask.estimated_hours}
+              value={newTask.estimated_hours ?? ""}
               placeholder="Estimated Hours"
               onChange={(e) =>
                 setNewTask({
@@ -630,7 +639,17 @@ export default function ProjectDetail() {
       {editingTask && (
         <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center">
           <div className="bg-white rounded-lg p-6 w-96 shadow-lg">
-            <h3 className="text-xl font-semibold mb-4">Edit Task</h3>
+            {/* Header + Close Button */}
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-semibold">Edit Task</h3>
+              <button
+                onClick={() => setEditingTask(null)}
+                className="text-gray-500 hover:text-gray-700 text-xl font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
             <div>
               <label className="block text-sm font-medium mb-1">
                 Title

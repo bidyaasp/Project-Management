@@ -26,7 +26,7 @@ export default function TaskDetails() {
     description: "",
     due_date: "",
     assignee_id: "",
-    priority: "medium",       // default instead of ""
+    priority: "low",       // default instead of ""
     estimated_hours: null,    // null instead of ""
     actual_hours: null,       // null instead of ""
   });
@@ -436,10 +436,16 @@ export default function TaskDetails() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg p-6 
                         max-h-[90vh] overflow-y-auto">
-
-            <h2 className="text-2xl font-bold mb-4 text-gray-800 border-b pb-2">
-              Edit Task
-            </h2>
+            {/* Header + Close Button */}
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-semibold">Edit Task</h3>
+              <button
+                onClick={() => setEditing(false)}
+                className="text-gray-500 hover:text-gray-700 text-xl font-bold"
+              >
+                ✕
+              </button>
+            </div>
 
             <div className="space-y-4">
               <div>
@@ -579,7 +585,17 @@ export default function TaskDetails() {
       {showLogWorkModal && (
         <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded-lg w-96 shadow-xl">
-            <h3 className="text-xl font-semibold mb-4">Log Work</h3>
+            {/* Header + Close Button */}
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-semibold mb-4">Log Work</h3>
+              <button
+                onClick={() => setShowLogWorkModal(false)}
+                className="text-gray-500 hover:text-gray-700 text-xl font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
 
             <form onSubmit={handleLogWorkSubmit} className="flex flex-col gap-4">
               <div>

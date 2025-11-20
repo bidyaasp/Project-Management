@@ -24,12 +24,22 @@ export default function TaskList() {
   });
   const [projectMembers, setProjectMembers] = useState([]);
 
+  const [filters, setFilters] = useState({
+    status: "",
+    priority: "",
+    assignee: ""
+  });
+
+
+
   const { user } = useAuth();
 
   const navigate = useNavigate();
 
   const canManage =
     user && ["admin", "manager"].includes(user.role?.name?.toLowerCase());
+
+  const role = user?.role?.name?.toLowerCase();
 
   // Load tasks
   useEffect(() => {
@@ -57,36 +67,55 @@ export default function TaskList() {
   }, [canManage]);
 
   // Sort tasks
-const sortedTasks = useMemo(() => {
-  const sorted = [...tasks];
+  const sortedTasks = useMemo(() => {
+    // 1️⃣ Filtering
+    let filtered = tasks.filter((t) => {
+      const statusMatch =
+        !filters.status || t.status === filters.status;
 
-  sorted.sort((a, b) => {
-    let aVal = a[sortBy];
-    let bVal = b[sortBy];
+      const priorityMatch =
+        !filters.priority || t.priority === filters.priority;
 
-    // special handling for certain fields
-    if (sortBy === "assignee") {
-      aVal = a.assignee?.name || "";
-      bVal = b.assignee?.name || "";
-    } else if (sortBy === "status") {
-      const statusOrder = { todo: 1, in_progress: 2, done: 3 };
-      aVal = statusOrder[a.status] || 99;
-      bVal = statusOrder[b.status] || 99;
-    } else if (sortBy === "due_date") {
-      aVal = a.due_date ? new Date(a.due_date) : new Date(0);
-      bVal = b.due_date ? new Date(b.due_date) : new Date(0);
-    } else if (sortBy === "project") {
-      aVal = a.project?.title || "";
-      bVal = b.project?.title || "";
-    }
+      const assigneeMatch =
+        !filters.assignee || String(t.assignee?.id) === filters.assignee;
 
-    if (aVal < bVal) return sortOrder === "asc" ? -1 : 1;
-    if (aVal > bVal) return sortOrder === "asc" ? 1 : -1;
-    return 0;
-  });
+      return statusMatch && priorityMatch && assigneeMatch;
+    });
 
-  return sorted;
-}, [tasks, sortBy, sortOrder]);
+    // 2️⃣ Sorting (your logic unchanged)
+    const sorted = [...filtered];
+
+    sorted.sort((a, b) => {
+      let aVal = a[sortBy];
+      let bVal = b[sortBy];
+
+      // special handling for certain fields
+      if (sortBy === "assignee") {
+        aVal = a.assignee?.name || "";
+        bVal = b.assignee?.name || "";
+      } else if (sortBy === "status") {
+        const statusOrder = { todo: 1, in_progress: 2, done: 3 };
+        aVal = statusOrder[a.status] || 99;
+        bVal = statusOrder[b.status] || 99;
+      } else if (sortBy === "due_date") {
+        aVal = a.due_date ? new Date(a.due_date) : new Date(0);
+        bVal = b.due_date ? new Date(b.due_date) : new Date(0);
+      } else if (sortBy === "project") {
+        aVal = a.project?.title || "";
+        bVal = b.project?.title || "";
+      }
+
+      if (aVal < bVal) return sortOrder === "asc" ? -1 : 1;
+      if (aVal > bVal) return sortOrder === "asc" ? 1 : -1;
+      return 0;
+    });
+
+    return sorted;
+  }, [tasks, sortBy, sortOrder, filters]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filters]);
 
   // Pagination
   const totalPages = Math.ceil(sortedTasks.length / pageSize);
@@ -187,6 +216,60 @@ const sortedTasks = useMemo(() => {
           <p className="text-gray-500">No tasks assigned yet.</p>
         ) : (
           <>
+            {/* FILTERS */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+
+              {/* Status */}
+              <select
+                value={filters.status}
+                onChange={(e) => setFilters({ ...filters, status: e.target.value })}
+                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2
+               text-sm text-gray-700 shadow-sm focus:border-blue-500
+               focus:ring focus:ring-blue-200 transition"
+              >
+                <option value="">All Status</option>
+                <option value="todo">To Do</option>
+                <option value="in_progress">In Progress</option>
+                <option value="done">Completed</option>
+              </select>
+
+              {/* Priority */}
+              <select
+                value={filters.priority}
+                onChange={(e) => setFilters({ ...filters, priority: e.target.value })}
+                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2
+               text-sm text-gray-700 shadow-sm focus:border-blue-500
+               focus:ring focus:ring-blue-200 transition"
+              >
+                <option value="">All Priority</option>
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+              </select>
+
+              {/* Assignee */}
+              {canManage && (
+                <select
+                  value={filters.assignee}
+                  onChange={(e) => setFilters({ ...filters, assignee: e.target.value })}
+                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2
+                text-sm text-gray-700 shadow-sm focus:border-blue-500
+                focus:ring focus:ring-blue-200 transition"
+                >
+                  <option value="">All Assignees</option>
+                  {role === "manager" && (
+                    <option key={user.id} value={user.id}>{user.name} (Me)</option>
+                  )}
+                  
+                  {users.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
@@ -215,6 +298,12 @@ const sortedTasks = useMemo(() => {
                       Status{" "}
                       {sortBy === "status" &&
                         (sortOrder === "asc" ? "▲" : "▼")}
+                    </th>
+                    <th
+                      onClick={() => handleSort("priority")}
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer"
+                    >
+                      Priority {sortBy === "priority" && (sortOrder === "asc" ? "▲" : "▼")}
                     </th>
                     <th
                       onClick={() => handleSort("due_date")}
@@ -266,6 +355,18 @@ const sortedTasks = useMemo(() => {
                             {t.status.replace("_", " ").toUpperCase()}
                           </span>
                         </td>
+                        <td className="px-6 py-4 text-sm">
+                          <span
+                            className={`px-2 py-1 text-xs font-medium rounded-full ${t.priority === "high"
+                              ? "bg-red-100 text-red-800"
+                              : t.priority === "medium"
+                                ? "bg-yellow-100 text-yellow-800"
+                                : "bg-blue-100 text-blue-800"
+                              }`}
+                          >
+                            {String(t.priority || "LOW").toUpperCase()}
+                          </span>
+                        </td>
                         <td
                           className={`px-6 py-4 text-sm font-medium ${dueDateColor}`}
                         >
@@ -276,6 +377,7 @@ const sortedTasks = useMemo(() => {
                             </span>
                           )}
                         </td>
+
 
                         {canManage && (
                           <td
@@ -343,6 +445,13 @@ const sortedTasks = useMemo(() => {
       {showTaskForm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl shadow-2xl w-[90%] max-w-lg max-h-[90vh] overflow-y-auto p-6 relative">
+            {/* ❌ Close Button */}
+            <button
+              onClick={() => setShowTaskForm(false)}
+              className="absolute top-3 right-3 text-gray-500 hover:text-gray-700 text-xl"
+            >
+              ✕
+            </button>
             <h3 className="text-xl font-semibold mb-4">Add Task</h3>
 
             <div className="space-y-4">
@@ -501,6 +610,13 @@ const sortedTasks = useMemo(() => {
       {editingTask && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl shadow-2xl w-[90%] max-w-lg max-h-[90vh] overflow-y-auto p-6 relative">
+            {/* ❌ Close Button */}
+            <button
+              onClick={() => setEditingTask(null)}
+              className="absolute top-3 right-3 text-gray-500 hover:text-gray-700 text-xl"
+            >
+              ✕
+            </button>
             <h3 className="text-xl font-semibold mb-4">Edit Task</h3>
             <div className="space-y-4">
               <div>
