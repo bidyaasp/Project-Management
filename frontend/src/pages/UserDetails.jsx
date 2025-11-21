@@ -12,6 +12,14 @@ export default function UserDetails() {
   const [loadingTasks, setLoadingTasks] = useState(false);
   const navigate = useNavigate();
   const { user: currentUser } = useAuth();
+  const [currentPage, setCurrentPage] = useState(1);
+  const tasksPerPage = 5; // you can change this
+
+  const indexOfLast = currentPage * tasksPerPage;
+  const indexOfFirst = indexOfLast - tasksPerPage;
+  const currentTasks = tasks.slice(indexOfFirst, indexOfLast);
+
+  const totalPages = Math.ceil(tasks.length / tasksPerPage);
 
   const isAdmin = currentUser?.role?.name?.toLowerCase() === "admin";
 
@@ -85,7 +93,7 @@ export default function UserDetails() {
     <div className="mt-10">
       {/* 🔙 Back Button */}
       <button
-        onClick={() => navigate(-1)}
+        onClick={() => navigate("/users")}
         className="flex items-center text-blue-600 hover:underline mb-6 text-sm font-medium"
       >
         ← Back to Users
@@ -206,7 +214,7 @@ export default function UserDetails() {
                 </tr>
               </thead>
               <tbody>
-                {tasks.map((t) => {
+                {currentTasks.map((t) => {
                   const overdue =
                     t.due_date && new Date(t.due_date) < new Date() && t.status !== "done";
                   return (
@@ -268,6 +276,31 @@ export default function UserDetails() {
                 })}
               </tbody>
             </table>
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex justify-center items-center gap-3 mt-4">
+                <button
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage((p) => p - 1)}
+                  className="px-3 py-1 border rounded disabled:opacity-50"
+                >
+                  Prev
+                </button>
+
+                <span className="text-sm text-gray-700">
+                  Page {currentPage} of {totalPages}
+                </span>
+
+                <button
+                  disabled={currentPage === totalPages}
+                  onClick={() => setCurrentPage((p) => p + 1)}
+                  className="px-3 py-1 border rounded disabled:opacity-50"
+                >
+                  Next
+                </button>
+              </div>
+            )}
+
           </div>
         )}
       </div>
