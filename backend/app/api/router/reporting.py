@@ -5,6 +5,7 @@ from datetime import datetime
 from app.db import models
 from app.db.database import get_db
 from app.deps import get_current_user
+from sqlalchemy import select
 
 router = APIRouter()
 
@@ -146,10 +147,10 @@ def summary_dashboard(
     # --------------------------------------------------
     else:
         # Get all project IDs where this user is a member
-        project_ids = (
+        project_ids = select(
             db.query(models.project_members.c.project_id)
-            .filter(models.project_members.c.user_id == current_user.id)
-            .subquery()
+                .filter(models.project_members.c.user_id == current_user.id)
+                .subquery()
         )
 
         # Count projects they are part of

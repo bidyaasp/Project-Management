@@ -10,7 +10,11 @@ export default function Dashboard() {
   const { user } = useAuth()
   const navigate = useNavigate()
 
+  const role = user?.role?.name
+
   useEffect(() => {
+    if (!user) return; // ⛔ do nothing until logged in
+
     const fetchSummary = async () => {
       try {
         const res = await api.get('/reporting/summary')
@@ -100,7 +104,7 @@ export default function Dashboard() {
           title="Users"
           value={totals.users}
           icon="👥"
-          onClick={() => navigate('/users')}
+          onClick={role !== "developer" ? () => navigate('/users') : undefined}
         />
       </div>
 
